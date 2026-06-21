@@ -53,10 +53,6 @@ with JsonRpcClient() as client:
 | `observability/` | Structured logging and diagnostics RPC |
 | `ipc/` | JSON-RPC server on stdin/stdout |
 
-### AgentMesh (`agentmesh/`)
-
-Optional asyncio multi-agent tooling for development workflows (design review, CI checks). See [agentmesh/docs/AGENTMESH.md](../agentmesh/docs/AGENTMESH.md).
-
 ### IPC Protocol
 
 Line-delimited JSON-RPC 2.0:

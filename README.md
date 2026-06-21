@@ -9,7 +9,6 @@
 - **Source validation** — Blocks third-party or unofficial update channels with audit logging
 - **Native GUI** — wxLua desktop interface with update listing and dry-run apply
 - **JSON-RPC backend** — Line-delimited IPC between GUI and Python backend
-- **AgentMesh** — Optional multi-agent dev tooling for design review and CI workflows
 - **CI/CD** — Cross-platform automated testing on every pull request
 
 ## Architecture
@@ -17,7 +16,6 @@
 ```
 gui/          wxLua frontend (native widgets)
 backend/      Python backend (veripatch package)
-agentmesh/    Optional asyncio multi-agent dev tooling
 tests/        Unit, integration, and GUI validation tests
 docs/         Architecture and source policy documentation
 ```
@@ -61,17 +59,6 @@ lua main.lua
 
 Set `VERIPATCH_PYTHON` to override the Python executable used by the GUI.
 
-### AgentMesh (optional)
-
-```bash
-cd agentmesh
-pip install -e ".[dev]"
-agentmesh bootstrap
-agentmesh start development --here
-```
-
-See [agentmesh/docs/AGENTMESH.md](agentmesh/docs/AGENTMESH.md).
-
 ## Development Workflow
 
 | Branch    | Purpose                          |
@@ -112,6 +99,8 @@ Set `VERIPATCH_DRY_RUN=1` to force dry-run mode for the backend IPC server.
 Real apply requires `confirm=true`, `confirm_token=veripatch-confirm-apply`, and elevated privileges.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
+
+Stable releases publish a Windows installer after [AgentMesh consensus](docs/RELEASE.md). See [docs/RELEASE.md](docs/RELEASE.md) for the release process.
 
 ## License
 
