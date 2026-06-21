@@ -1,0 +1,25 @@
+name: Feature Request
+description: Propose a new feature for VeriPatch
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: checkboxes
+    id: source_policy
+    attributes:
+      label: Source policy compliance
+      options:
+        - label: This feature uses only official, verified update sources
+          required: true

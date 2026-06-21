@@ -1,0 +1,96 @@
+"""Base updater interface and shared types."""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
+
+from veripatch.detection.os_detect import OSInfo
+from veripatch.privileges.audit import AuditLogger
+from veripatch.sources.validator import SourceValidator
+
+
+class UpdateStatus(StrEnum):
+    AVAILABLE = "available"
+    PENDING = "pending"
+    APPLIED = "applied"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+@dataclass
+class UpdateItem:
+    """Represents a single available or applied update."""
+
+    id: str
+    title: str
+    source_id: str
+    status: UpdateStatus = UpdateStatus.AVAILABLE
+    severity: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "source_id": self.source_id,
+            "status": self.status.value,
+            "severity": self.severity,
+            "metadata": self.metadata,
+        }
+
+
+@dataclass
+class UpdateResult:
+    """Result of an update check or apply operation."""
+
+    success: bool
+    dry_run: bool
+    message: str
+    items: list[UpdateItem] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "success": self.success,
+            "dry_run": self.dry_run,
+            "message": self.message,
+            "items": [item.to_dict() for item in self.items],
+            "errors": self.errors,
+        }
+
+
+class Updater(ABC):
+    """Abstract base class for OS-specific updaters."""
+
+    def __init__(
+        self,
+        os_info: OSInfo,
+        validator: SourceValidator | None = None,
+        audit_logger: AuditLogger | None = None,
+    ) -> None:
+        self.os_info = os_info
+        self.validator = validator or SourceValidator()
+        self.audit = audit_logger or AuditLogger()
+
+    @abstractmethod
+    def check(self) -> UpdateResult:
+        """Verify update tooling is available."""
+
+    @abstractmethod
+    def list_updates(self) -> UpdateResult:
+        """List available updates from official sources."""
+
+    @abstractmethod
+    def apply(self, dry_run: bool = True) -> UpdateResult:
+        """Apply updates. Defaults to dry-run in foundation iteration."""
+
+    def _validate(self, command: list[str]) -> bool:
+        outcome = self.validator.validate_command(
+            command,
+            self.os_info.os_type,
+            self.os_info.package_manager,
+        )
+        return outcome.approved

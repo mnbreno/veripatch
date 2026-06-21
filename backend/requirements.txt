@@ -1,0 +1,2 @@
+# VeriPatch backend runtime dependencies
+# Uses only Python standard library in v0.1.0
