@@ -30,6 +30,10 @@ class MessageBus(ABC):
         """Send a message to all registered agents."""
 
     @abstractmethod
+    async def receive(self, recipient: str, *, timeout: float = 30.0) -> Message:
+        """Wait for the next message for recipient."""
+
+    @abstractmethod
     async def history(self, *, limit: int = 100) -> list[Message]:
         """Return recent messages for traceability."""
 

@@ -92,7 +92,7 @@ class ScriptedBrain(Brain):
                 "checklist_total": 8,
             },
         }
-        base.update(role_outputs.get(agent_id, {"output": f"{agent_id} processed task"}))
+        base.update(role_outputs.get(agent_id, {"output": f"{agent_id} processed task"}))  # type: ignore[call-overload]
         return base
 
     def _next_agent(self, agent_id: str, message: Message) -> str | None:

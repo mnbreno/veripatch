@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict, deque
+from collections.abc import Callable
 
 from agentmesh.bus.base import MessageBus
 from agentmesh.protocol import BROADCAST, Message
@@ -14,6 +15,7 @@ class InMemoryBus(MessageBus):
 
     def __init__(self, history_limit: int = 1000, queue_maxsize: int = 0) -> None:
         super().__init__()
+        self._factory: Callable[[], asyncio.Queue[Message]]
         self._factory = lambda: asyncio.Queue(maxsize=queue_maxsize)
         self._queues: dict[str, asyncio.Queue[Message]] = defaultdict(self._factory)
         self._events: dict[str, asyncio.Event] = defaultdict(asyncio.Event)
@@ -71,8 +73,9 @@ class InMemoryBus(MessageBus):
         if self._shutdown_event.is_set():
             raise asyncio.CancelledError("Bus is shut down")
         if not done:
-            raise asyncio.TimeoutError(f"No message for {recipient} within {timeout}s")
+            raise TimeoutError(f"No message for {recipient} within {timeout}s")
         result = done.pop().result()
+        assert isinstance(result, Message)
         event.clear()
         return result
 

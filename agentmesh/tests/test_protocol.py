@@ -1,7 +1,5 @@
 """Tests for message protocol."""
 
-import time
-
 from agentmesh.protocol import (
     BROADCAST,
     Message,

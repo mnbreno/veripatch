@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import os
 import sys
+from pathlib import Path
 
 from agentmesh.agent.brain import get_brain
 from agentmesh.agent.spec import load_agent_spec, load_all_agents
@@ -23,7 +24,7 @@ from agentmesh.selection import INTENT_AGENT_PRIORITY
 from agentmesh.workflows import WORKFLOWS, run_workflow
 
 
-def _agents_dir():
+def _agents_dir() -> Path:
     return default_agents_dir()
 
 

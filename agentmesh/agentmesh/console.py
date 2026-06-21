@@ -25,16 +25,16 @@ def console_text(text: str) -> str:
 
 def console_print(*args: object, **kwargs: object) -> None:
     """Print with graceful fallback when emoji or other Unicode cannot be encoded."""
-    end = kwargs.pop("end", "\n") if isinstance(kwargs.get("end"), str) else "\n"
-    sep = kwargs.pop("sep", " ") if isinstance(kwargs.get("sep"), str) else " "
+    end = str(kwargs.pop("end", "\n") if isinstance(kwargs.get("end"), str) else "\n")
+    sep = str(kwargs.pop("sep", " ") if isinstance(kwargs.get("sep"), str) else " ")
     file = kwargs.pop("file", sys.stdout)
     flush = kwargs.pop("flush", False)
-    text = console_text(sep.join(str(arg) for arg in args) + str(end))
+    text = console_text(sep.join(str(arg) for arg in args) + end)
     try:
-        file.write(text)  # type: ignore[union-attr]
+        file.write(text)  # type: ignore[attr-defined,union-attr]
     except UnicodeEncodeError:
         encoding = getattr(file, "encoding", None) or "utf-8"
-        file.buffer.write(text.encode(encoding, errors="replace"))  # type: ignore[union-attr]
+        file.buffer.write(text.encode(encoding, errors="replace"))  # type: ignore[attr-defined,union-attr]
     if flush:
         flush_fn = getattr(file, "flush", None)
         if flush_fn is not None:

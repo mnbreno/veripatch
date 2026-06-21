@@ -130,7 +130,9 @@ class FileBus(MessageBus):
         for inbox_dir in self.inboxes.iterdir():
             if not inbox_dir.is_dir():
                 continue
-            for path in list(inbox_dir.glob("*.json")) + list(inbox_dir.glob(f"*{self.PROCESSING_SUFFIX}")):
+            json_files = list(inbox_dir.glob("*.json"))
+            proc_files = list(inbox_dir.glob(f"*{self.PROCESSING_SUFFIX}"))
+            for path in json_files + proc_files:
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
                     msg = Message.from_dict(data)

@@ -51,7 +51,6 @@ class JsonRpcServer:
             "list_sources": self._handle_list_sources,
             "check_updates": self._handle_check_updates,
             "apply_updates": self._handle_apply_updates,
-            "apply_updates_stream": self._handle_apply_updates_stream,
             "diagnostics": self._handle_diagnostics,
             "ping": self._handle_ping,
             "shutdown": self._handle_shutdown,

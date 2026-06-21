@@ -27,7 +27,7 @@ class AgentRuntimeLock:
     def from_dict(cls, data: dict[str, object]) -> AgentRuntimeLock:
         return cls(
             agent_id=str(data["agent_id"]),
-            pid=int(data["pid"]),
+            pid=int(str(data["pid"])),
             started_at=str(data["started_at"]),
             command=str(data.get("command", "")),
             terminal_session=str(data.get("terminal_session", "")),
@@ -189,7 +189,8 @@ class AgentRegistry:
         lock = self.acquire(agent_id, command=command)
 
         def _release() -> None:
-            if self.read_lock(agent_id) and self.read_lock(agent_id).pid == lock.pid:
+            existing = self.read_lock(agent_id)
+            if existing is not None and existing.pid == lock.pid:
                 self.release(agent_id)
 
         atexit.register(_release)

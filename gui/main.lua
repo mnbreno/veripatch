@@ -39,3 +39,6 @@ frame:build()
 frame:show()
 
 app:MainLoop()
+
+-- Ensure the backend process is closed when the GUI application exits.
+frame.ipc_client:close()

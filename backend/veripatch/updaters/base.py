@@ -136,4 +136,5 @@ class Updater(ABC):
             while True:
                 yield next(stream)
         except StopIteration as exc:
-            return exc.value
+            result: ExecutionResult = exc.value
+            return result

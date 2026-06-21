@@ -7,7 +7,7 @@ import pytest
 
 from agentmesh.bus.file_bus import FileBus
 from agentmesh.bus.memory_bus import InMemoryBus
-from agentmesh.protocol import BROADCAST, Message, create_request
+from agentmesh.protocol import BROADCAST, create_request
 
 
 @pytest.mark.asyncio

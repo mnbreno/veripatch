@@ -20,6 +20,7 @@ function MainFrame.new(parent, backend_config)
   self.apply_dry_run = true
   self.apply_confirmed = false
   self.elevated = false
+  self.log_output = nil -- New member for log display
   self.ipc_client = ipc.new(
     backend_config.python_cmd or "python",
     backend_config.args or {"-m", "veripatch"},
@@ -36,7 +37,7 @@ function MainFrame:build()
     wx.wxID_ANY,
     "VeriPatch - Official Source Updates",
     wx.wxDefaultPosition,
-    wx.wxSize(720, 520)
+    wx.wxSize(720, 700) -- Increased height to accommodate log
   )
 
   local panel = wx.wxPanel(self.frame, wx.wxID_ANY)
@@ -65,11 +66,19 @@ function MainFrame:build()
 
   self.status_label = wx.wxStaticText(panel, wx.wxID_ANY, ViewModel.STATUS.READY)
 
+  local log_box = wx.wxStaticBox(panel, wx.wxID_ANY, "Process Output")
+  local log_sizer = wx.wxStaticBoxSizer(log_box, wx.wxVERTICAL)
+  self.log_output = wx.wxTextCtrl(panel, wx.wxID_ANY, "",
+    wx.wxDefaultPosition, wx.wxDefaultSize, wx.wxTE_MULTILINE + wx.wxTE_READONLY + wx.wxHSCROLL)
+  self.log_output:SetFont(wx.wxFont(10, wx.wxFONTFAMILY_TELETYPE, wx.wxFONTSTYLE_NORMAL, wx.wxFONTWEIGHT_NORMAL))
+  log_sizer:Add(self.log_output, 1, wx.wxEXPAND + wx.wxALL, 5)
+
   sizer:Add(os_sizer, 0, wx.wxEXPAND + wx.wxALL, 5)
   sizer:Add(src_sizer, 1, wx.wxEXPAND + wx.wxLEFT + wx.wxRIGHT, 5)
   sizer:Add(upd_sizer, 2, wx.wxEXPAND + wx.wxLEFT + wx.wxRIGHT, 5)
   sizer:Add(btn_sizer, 0, wx.wxALL, 5)
   sizer:Add(self.status_label, 0, wx.wxALL, 5)
+  sizer:Add(log_sizer, 2, wx.wxEXPAND + wx.wxALL, 5) -- Add log sizer
 
   panel:SetSizer(sizer)
 
@@ -129,7 +138,16 @@ function MainFrame:refresh()
   self:set_status(upd_status or ViewModel.STATUS.LOADED)
 end
 
+function MainFrame:append_log(msg)
+  if self.log_output then
+    self.log_output:AppendText(msg .. "\n")
+    -- Scroll to bottom automatically
+    self.log_output:ShowPosition(self.log_output:GetLastPosition())
+  end
+end
+
 function MainFrame:apply_updates()
+  self:clear_log()
   local dry_run = self.apply_dry_run
   if not dry_run then
     local ok, reason = ViewModel.can_apply_real(
@@ -139,19 +157,35 @@ function MainFrame:apply_updates()
     )
     if not ok then
       self:set_status(reason)
+      self:append_log(reason)
       return
     end
   end
 
   self:set_status(dry_run and "Applying updates (dry run)..." or "Applying updates...")
+  self:append_log(dry_run and "Initiating dry-run update..." or "Initiating real update...")
 
   local params = ViewModel.build_apply_params(
     dry_run,
     self.apply_confirmed,
     config.APPLY_CONFIRMATION_TOKEN
   )
-  local result, err = self.ipc_client:call("apply_updates", params)
+  local result, err = self.ipc_client:call("apply_updates_stream", params, function(line)
+    self:append_log(line)
+  end)
+
   self:set_status(ViewModel.format_apply_status(result, err, dry_run))
+  if err then
+    self:append_log("ERROR: " .. err)
+  else
+    self:append_log("Update process completed.")
+  end
+end
+
+function MainFrame:clear_log()
+  if self.log_output then
+    self.log_output:Clear()
+  end
 end
 
 return MainFrame
