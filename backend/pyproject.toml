@@ -29,7 +29,7 @@ include = ["veripatch*"]
 [tool.pytest.ini_options]
 testpaths = ["../tests"]
 pythonpath = ["."]
-addopts = "-v --tb=short --cov=veripatch --cov-fail-under=75"
+addopts = "-v --tb=short --cov=veripatch --cov-fail-under=80"
 
 [tool.ruff]
 line-length = 100

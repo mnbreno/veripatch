@@ -39,7 +39,7 @@ jobs:
         run: mypy veripatch
 
       - name: Pytest with coverage gate
-        run: pytest tests/ -v --cov=veripatch --cov-report=xml --cov-fail-under=75
+        run: pytest tests/ -v --cov=veripatch --cov-report=xml --cov-fail-under=80
         env:
           PYTHONPATH: backend
 
