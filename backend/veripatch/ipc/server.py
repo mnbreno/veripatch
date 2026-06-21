@@ -32,6 +32,8 @@ INTERNAL_ERROR = -32603
 
 def _env_dry_run() -> bool:
     return os.environ.get("VERIPATCH_DRY_RUN", "").lower() in ("1", "true", "yes")
+
+
 INVALID_PARAMS = -32602
 
 
@@ -42,6 +44,8 @@ class JsonRpcServer:
         self.debug = debug
         self.audit = AuditLogger()
         self.log = get_logger("veripatch.ipc")
+        self.request_count = 0
+        self._shutdown_requested = False
         self._handlers: dict[str, Handler] = {
             "detect_os": self._handle_detect_os,
             "list_sources": self._handle_list_sources,
@@ -49,10 +53,15 @@ class JsonRpcServer:
             "apply_updates": self._handle_apply_updates,
             "diagnostics": self._handle_diagnostics,
             "ping": self._handle_ping,
+            "shutdown": self._handle_shutdown,
         }
 
     def _handle_ping(self, _params: dict[str, Any] | list[Any] | None) -> dict[str, str]:
         return {"status": "ok"}
+
+    def _handle_shutdown(self, _params: dict[str, Any] | list[Any] | None) -> dict[str, Any]:
+        self._shutdown_requested = True
+        return {"status": "shutting_down", "requests_served": self.request_count + 1}
 
     def _handle_detect_os(self, _params: dict[str, Any] | list[Any] | None) -> dict[str, Any]:
         info = detect_os()
@@ -91,7 +100,11 @@ class JsonRpcServer:
         limit = 20
         if isinstance(params, dict) and "audit_limit" in params:
             limit = int(params["audit_limit"])
-        return get_diagnostics(self.audit, audit_limit=limit)
+        return get_diagnostics(
+            self.audit,
+            audit_limit=limit,
+            session={"requests_served": self.request_count},
+        )
 
     def _handle_apply_updates(self, params: dict[str, Any] | list[Any] | None) -> dict[str, Any]:
         dry_run = True
@@ -167,3 +180,6 @@ class JsonRpcServer:
             response_dict = self.handle_request(request)
             sys.stdout.write(json.dumps(response_dict, separators=(",", ":")) + "\n")
             sys.stdout.flush()
+            self.request_count += 1
+            if self._shutdown_requested:
+                break

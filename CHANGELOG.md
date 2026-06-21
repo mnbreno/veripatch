@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here.
 
+## [1.1.0] — Unreleased
+
+### VeriPatch
+
+- Persistent JSON-RPC sessions with `shutdown` method and request tracking
+- Python `JsonRpcClient` for multi-call backend sessions
+- Cross-platform stderr redirect in wxLua IPC client (Linux/macOS/Windows)
+- `diagnostics` includes session `requests_served` during persistent sessions
+
 ## [1.0.0] — 2026-06-21
 
 ### VeriPatch — Stable release

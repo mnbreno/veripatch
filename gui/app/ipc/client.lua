@@ -3,6 +3,13 @@
 
 local ipc = {}
 
+local function stderr_redirect()
+  if package.config:sub(1, 1) == "\\" then
+    return " 2>nul"
+  end
+  return " 2>/dev/null"
+end
+
 local function json_encode(value)
   if type(value) ~= "table" then
     error("json_encode expects a table")
@@ -63,7 +70,7 @@ function ipc:start()
   for _, arg in ipairs(self.args) do
     cmd_line = cmd_line .. " " .. arg
   end
-  local ok, proc = pcall(io.popen, cmd_line .. " 2>nul", "w")
+  local ok, proc = pcall(io.popen, cmd_line .. stderr_redirect(), "w")
   if not ok or not proc then
     return false, "Failed to start backend process"
   end
@@ -107,7 +114,10 @@ function ipc:call(method, params)
   end
 
   local full_cmd = table.concat(cmd_parts, " ")
-  local handle = io.popen('echo ' .. payload:gsub('"', '\\"') .. ' | ' .. full_cmd, "r")
+  local handle = io.popen(
+    'echo ' .. payload:gsub('"', '\\"') .. ' | ' .. full_cmd .. stderr_redirect(),
+    "r"
+  )
   if not handle then
     return nil, "Failed to invoke backend"
   end

@@ -27,7 +27,17 @@ flowchart LR
   - `app/ui/view_model.lua` — Pure logic for labels, gating, and apply params
   - `app/ipc/client.lua` — JSON-RPC client spawning Python backend
 
-The GUI spawns `python -m veripatch` for each IPC call. Future versions may use a persistent backend process.
+The GUI spawns `python -m veripatch` for each IPC call. Persistent sessions are supported via `JsonRpcClient` (Python) or by keeping stdin open across multiple JSON-RPC lines; use `shutdown` to end the session cleanly.
+
+### Python IPC Client
+
+```python
+from veripatch.ipc import JsonRpcClient
+
+with JsonRpcClient() as client:
+    client.call("ping")
+    client.call("check_updates")
+```
 
 ### Backend Layer (`backend/veripatch/`)
 
@@ -58,7 +68,8 @@ Line-delimited JSON-RPC 2.0:
 | `list_sources` | Returns official sources for current OS |
 | `check_updates` | Validates sources and lists available updates |
 | `apply_updates` | Applies updates (dry-run by default) |
-| `diagnostics` | Returns audit tail and runtime diagnostics |
+| `diagnostics` | Returns audit tail, capabilities, and session stats |
+| `shutdown` | Gracefully ends a persistent IPC session |
 
 Request example:
 
@@ -93,7 +104,7 @@ Response example:
 
 ## Future Work
 
-- Persistent backend process with streaming updates
+- GUI integration with persistent backend process
 - Windows Update Agent COM integration
 - Interactive elevation request flows per OS (UAC, sudo, pkexec)
 - Code signing and update verification

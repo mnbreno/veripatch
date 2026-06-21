@@ -78,3 +78,28 @@ def test_ipc_unknown_method() -> None:
     response = _run_rpc("nonexistent_method")
     assert "error" in response
     assert response["error"]["code"] == -32601
+
+
+def test_ipc_persistent_session() -> None:
+    requests = [
+        {"jsonrpc": "2.0", "method": "ping", "params": {}, "id": 1},
+        {"jsonrpc": "2.0", "method": "detect_os", "params": {}, "id": 2},
+        {"jsonrpc": "2.0", "method": "shutdown", "params": {}, "id": 3},
+    ]
+    payload = "".join(json.dumps(req) + "\n" for req in requests)
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "veripatch"],
+        input=payload,
+        capture_output=True,
+        text=True,
+        cwd=str(BACKEND_DIR),
+        timeout=30,
+        env=IPC_ENV,
+    )
+    assert proc.returncode == 0, proc.stderr
+    lines = [json.loads(ln) for ln in proc.stdout.strip().splitlines() if ln.strip()]
+    assert len(lines) == 3
+    assert lines[0]["result"]["status"] == "ok"
+    assert "os" in lines[1]["result"]
+    assert lines[2]["result"]["status"] == "shutting_down"

@@ -36,12 +36,16 @@ def get_capabilities() -> dict[str, Any]:
     return caps
 
 
-def get_diagnostics(audit: AuditLogger | None = None, audit_limit: int = 20) -> dict[str, Any]:
+def get_diagnostics(
+    audit: AuditLogger | None = None,
+    audit_limit: int = 20,
+    session: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Return diagnostics payload for JSON-RPC."""
     info = detect_os()
     logger_audit = audit or AuditLogger()
     entries = logger_audit.read_entries()
-    return {
+    payload: dict[str, Any] = {
         "version": __version__,
         "python": sys.version,
         "os": info.to_dict(),
@@ -53,3 +57,6 @@ def get_diagnostics(audit: AuditLogger | None = None, audit_limit: int = 20) -> 
         ],
         "recent_audit_entries": entries[-audit_limit:],
     }
+    if session:
+        payload["session"] = session
+    return payload
