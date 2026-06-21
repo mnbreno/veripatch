@@ -8,8 +8,16 @@ All notable changes to this project are documented here.
 
 - Persistent JSON-RPC sessions with `shutdown` method and request tracking
 - Python `JsonRpcClient` for multi-call backend sessions
+- **`apply_updates_stream`** RPC with `apply_progress` notifications during apply
+- `CommandRunner.run_streaming()` and `Updater.apply_streaming()` for live output
 - Cross-platform stderr redirect in wxLua IPC client (Linux/macOS/Windows)
 - `diagnostics` includes session `requests_served` during persistent sessions
+
+### AgentMesh
+
+- Message TTL (`ttl_seconds`) with expiry checks and `prune_expired()`
+- FileBus two-phase delivery (`.processing` rename) with crash recovery
+- Bus `shutdown()` and periodic cleanup loop on `MessageBus`
 
 ## [1.0.0] — 2026-06-21
 

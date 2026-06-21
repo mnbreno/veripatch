@@ -32,13 +32,21 @@ class Message:
     context: dict[str, Any] = field(default_factory=dict)
     trace: list[str] = field(default_factory=list)
     timestamp: str = ""
+    ttl_seconds: float | None = None
 
     def __post_init__(self) -> None:
         if not self.timestamp:
             self.timestamp = datetime.now(UTC).isoformat()
 
+    def is_expired(self) -> bool:
+        if self.ttl_seconds is None:
+            return False
+        created = datetime.fromisoformat(self.timestamp)
+        elapsed = (datetime.now(UTC) - created).total_seconds()
+        return elapsed > self.ttl_seconds
+
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "id": self.id,
             "sender": self.sender,
             "recipient": self.recipient,
@@ -49,9 +57,13 @@ class Message:
             "trace": self.trace,
             "timestamp": self.timestamp,
         }
+        if self.ttl_seconds is not None:
+            result["ttl_seconds"] = self.ttl_seconds
+        return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Message:
+        ttl = data.get("ttl_seconds")
         return cls(
             id=str(data["id"]),
             sender=str(data["sender"]),
@@ -62,6 +74,7 @@ class Message:
             context=dict(data.get("context") or {}),
             trace=list(data.get("trace") or []),
             timestamp=str(data.get("timestamp") or ""),
+            ttl_seconds=float(ttl) if ttl is not None else None,
         )
 
     def validate(self) -> None:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 from veripatch.detection.os_detect import PackageManager
 from veripatch.execution.parsers import (
     parse_apt_upgradable,
@@ -177,4 +179,64 @@ class LinuxUpdater(Updater):
                 )
             ],
             errors=[] if result.success else [result.stderr or "Apply failed"],
+        )
+
+    def apply_streaming(
+        self,
+        dry_run: bool = True,
+    ) -> Generator[str | dict[str, Any], None, UpdateResult]:
+        pm = self._package_manager()
+        if pm == PackageManager.UNKNOWN:
+            return UpdateResult(
+                success=False,
+                dry_run=dry_run,
+                message="Unknown Linux package manager",
+                errors=["Could not determine distro-native package manager"],
+            )
+
+        cmd = _PM_APPLY_CMD[pm]
+        self.audit.log_action(
+            "linux_apply_updates",
+            {"package_manager": pm.value, "dry_run": dry_run, "streaming": True},
+        )
+        source_id = self._source_id()
+        exec_result = yield from self._yield_command_stream(
+            cmd,
+            dry_run=dry_run,
+            validate_cmd=_PM_APPLY_VALIDATE[pm],
+        )
+        if getattr(exec_result, "metadata", {}).get("rejected"):
+            return UpdateResult(
+                success=False,
+                dry_run=dry_run,
+                message="Apply rejected: command not from official source",
+                errors=[f"Validation failed for {pm.value} upgrade command"],
+            )
+        if dry_run:
+            return UpdateResult(
+                success=True,
+                dry_run=True,
+                message=exec_result.message,
+                items=[
+                    UpdateItem(
+                        id=f"linux-apply-dry-run-{pm.value}",
+                        title=f"[Dry-run] {pm.value.upper()} system upgrade",
+                        source_id=source_id,
+                        status=UpdateStatus.PENDING,
+                    )
+                ],
+            )
+        return UpdateResult(
+            success=exec_result.success,
+            dry_run=False,
+            message=exec_result.message,
+            items=[
+                UpdateItem(
+                    id=f"linux-applied-{pm.value}",
+                    title=f"{pm.value.upper()} upgrade executed",
+                    source_id=source_id,
+                    status=UpdateStatus.APPLIED if exec_result.success else UpdateStatus.FAILED,
+                )
+            ],
+            errors=[] if exec_result.success else [exec_result.stderr or "Apply failed"],
         )

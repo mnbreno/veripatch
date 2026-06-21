@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+from collections.abc import Generator
 
 from veripatch.execution.parsers import parse_softwareupdate_list
 from veripatch.updaters.base import UpdateItem, Updater, UpdateResult, UpdateStatus
@@ -114,4 +115,54 @@ class MacOSUpdater(Updater):
                 )
             ],
             errors=[] if result.success else [result.stderr or "Apply failed"],
+        )
+
+    def apply_streaming(
+        self,
+        dry_run: bool = True,
+    ) -> Generator[str, None, UpdateResult]:
+        cmd = ["softwareupdate", "--install", "--all"]
+        self.audit.log_action(
+            "macos_apply_updates",
+            {"dry_run": dry_run, "streaming": True},
+        )
+        exec_result = yield from self._yield_command_stream(
+            cmd,
+            dry_run=dry_run,
+            validate_cmd=["softwareupdate", "--install"],
+        )
+        if getattr(exec_result, "metadata", {}).get("rejected"):
+            return UpdateResult(
+                success=False,
+                dry_run=dry_run,
+                message="Apply rejected: command not from official source",
+                errors=["Validation failed for softwareupdate --install"],
+            )
+        if dry_run:
+            return UpdateResult(
+                success=True,
+                dry_run=True,
+                message=exec_result.message,
+                items=[
+                    UpdateItem(
+                        id="macos-apply-dry-run",
+                        title="[Dry-run] softwareupdate --install --all",
+                        source_id=self.SOURCE_SOFTWAREUPDATE,
+                        status=UpdateStatus.PENDING,
+                    )
+                ],
+            )
+        return UpdateResult(
+            success=exec_result.success,
+            dry_run=False,
+            message=exec_result.message,
+            items=[
+                UpdateItem(
+                    id="macos-applied",
+                    title="softwareupdate --install --all executed",
+                    source_id=self.SOURCE_SOFTWAREUPDATE,
+                    status=UpdateStatus.APPLIED if exec_result.success else UpdateStatus.FAILED,
+                )
+            ],
+            errors=[] if exec_result.success else [exec_result.stderr or "Apply failed"],
         )

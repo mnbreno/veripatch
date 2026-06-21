@@ -80,6 +80,31 @@ def test_ipc_unknown_method() -> None:
     assert response["error"]["code"] == -32601
 
 
+def test_ipc_apply_updates_stream_emits_progress() -> None:
+    request = {
+        "jsonrpc": "2.0",
+        "method": "apply_updates_stream",
+        "params": {"dry_run": True},
+        "id": 1,
+    }
+    payload = json.dumps(request) + "\n"
+    proc = subprocess.run(
+        [sys.executable, "-m", "veripatch"],
+        input=payload,
+        capture_output=True,
+        text=True,
+        cwd=str(BACKEND_DIR),
+        timeout=30,
+        env=IPC_ENV,
+    )
+    assert proc.returncode == 0, proc.stderr
+    lines = [json.loads(ln) for ln in proc.stdout.strip().splitlines() if ln.strip()]
+    assert len(lines) >= 2
+    assert lines[0]["method"] == "apply_progress"
+    assert "line" in lines[0]["params"]
+    assert lines[-1]["result"]["dry_run"] is True
+
+
 def test_ipc_persistent_session() -> None:
     requests = [
         {"jsonrpc": "2.0", "method": "ping", "params": {}, "id": 1},

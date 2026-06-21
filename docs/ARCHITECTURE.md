@@ -68,6 +68,7 @@ Line-delimited JSON-RPC 2.0:
 | `list_sources` | Returns official sources for current OS |
 | `check_updates` | Validates sources and lists available updates |
 | `apply_updates` | Applies updates (dry-run by default) |
+| `apply_updates_stream` | Applies updates with `apply_progress` notifications |
 | `diagnostics` | Returns audit tail, capabilities, and session stats |
 | `shutdown` | Gracefully ends a persistent IPC session |
 

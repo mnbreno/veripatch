@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
 from veripatch.detection.os_detect import OSInfo
-from veripatch.execution.runner import CommandRunner
+from veripatch.execution.runner import CommandRunner, ExecutionResult
 from veripatch.privileges.audit import AuditLogger
 from veripatch.sources.validator import SourceValidator
 
@@ -97,6 +98,13 @@ class Updater(ABC):
     def apply(self, dry_run: bool = True) -> UpdateResult:
         """Apply updates. Defaults to dry-run in foundation iteration."""
 
+    @abstractmethod
+    def apply_streaming(
+        self,
+        dry_run: bool = True,
+    ) -> Generator[str, None, UpdateResult]:
+        """Apply updates and yield progress/log lines."""
+
     def _validate(self, command: list[str]) -> bool:
         outcome = self.validator.validate_command(
             command,
@@ -104,3 +112,28 @@ class Updater(ABC):
             self.os_info.package_manager,
         )
         return outcome.approved
+
+    def _yield_command_stream(
+        self,
+        command: list[str],
+        *,
+        dry_run: bool,
+        validate_cmd: list[str] | None = None,
+    ) -> Generator[str, None, ExecutionResult]:
+        """Run a validated command via run_streaming, yielding output lines."""
+        check_cmd = validate_cmd or command
+        if not self._validate(check_cmd):
+            return ExecutionResult(
+                success=False,
+                dry_run=dry_run,
+                command=command,
+                message="Apply rejected: command not from official source",
+                metadata={"rejected": True},
+            )
+
+        stream = self.runner.run_streaming(command, dry_run=dry_run)
+        try:
+            while True:
+                yield next(stream)
+        except StopIteration as exc:
+            return exc.value

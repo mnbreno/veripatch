@@ -8,7 +8,6 @@ from agentmesh.agent.brain import Brain, get_brain
 from agentmesh.agent.prompts import PromptSystem
 from agentmesh.agent.spec import AgentSpec
 from agentmesh.bus.base import MessageBus
-from agentmesh.bus.memory_bus import InMemoryBus
 from agentmesh.protocol import (
     Message,
     MessageType,
@@ -111,10 +110,7 @@ class AgentWorker:
 
     async def run_once(self, *, timeout: float = 30.0) -> Message | None:
         """Wait for one message and handle it."""
-        if isinstance(self.bus, InMemoryBus):
-            inbound = await self.bus.receive(self.spec.agent_id, timeout=timeout)
-        else:
-            inbound = await self.bus.receive(self.spec.agent_id, timeout=timeout)
+        inbound = await self.bus.receive(self.spec.agent_id, timeout=timeout)
         outbound = await self.handle_message(inbound)
         if outbound is not None:
             await self.bus.send(outbound)
@@ -129,6 +125,8 @@ class AgentWorker:
                 result = await self.run_once(timeout=1.0)
             except TimeoutError:
                 continue
+            except asyncio.CancelledError:
+                break
             if result is not None:
                 results.append(result)
                 processed += 1

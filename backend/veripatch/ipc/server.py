@@ -51,6 +51,7 @@ class JsonRpcServer:
             "list_sources": self._handle_list_sources,
             "check_updates": self._handle_check_updates,
             "apply_updates": self._handle_apply_updates,
+            "apply_updates_stream": self._handle_apply_updates_stream,
             "diagnostics": self._handle_diagnostics,
             "ping": self._handle_ping,
             "shutdown": self._handle_shutdown,
@@ -106,7 +107,11 @@ class JsonRpcServer:
             session={"requests_served": self.request_count},
         )
 
-    def _handle_apply_updates(self, params: dict[str, Any] | list[Any] | None) -> dict[str, Any]:
+    def _apply_gate(
+        self,
+        params: dict[str, Any] | list[Any] | None,
+    ) -> tuple[bool, dict[str, Any] | None]:
+        """Return (dry_run, error_payload) where error_payload blocks apply."""
         dry_run = True
         confirm = False
         confirm_token = ""
@@ -118,7 +123,7 @@ class JsonRpcServer:
         if not dry_run:
             if not confirm or confirm_token != APPLY_CONFIRMATION_TOKEN:
                 self.audit.log_action("apply_rejected", {"reason": "missing_confirmation"})
-                return {
+                return dry_run, {
                     "success": False,
                     "dry_run": False,
                     "message": (
@@ -131,22 +136,64 @@ class JsonRpcServer:
             if not is_elevated():
                 request_elevation(audit_logger=self.audit)
                 self.audit.log_privilege_check(required=True, granted=False)
-                return {
+                return dry_run, {
                     "success": False,
                     "dry_run": False,
                     "message": "Elevation required. Re-run VeriPatch as administrator/root.",
                     "errors": ["Insufficient privileges for apply"],
                     "items": [],
                 }
+        return dry_run, None
+
+    def _handle_apply_updates(self, params: dict[str, Any] | list[Any] | None) -> dict[str, Any]:
+        dry_run, gate_error = self._apply_gate(params)
+        if gate_error:
+            return gate_error
 
         info = detect_os()
         updater = get_updater(info, audit_logger=self.audit, dry_run=_env_dry_run())
         result = updater.apply(dry_run=dry_run)
         return result.to_dict()
 
+    def _handle_apply_updates_stream(
+        self,
+        request: JsonRpcRequest,
+    ) -> dict[str, Any]:
+        """Stream apply progress as JSON-RPC notifications, then return final result."""
+        dry_run, gate_error = self._apply_gate(request.params)
+        if gate_error:
+            return make_result(request.id, gate_error).to_dict()
+
+        info = detect_os()
+        updater = get_updater(info, audit_logger=self.audit, dry_run=_env_dry_run())
+        stream = updater.apply_streaming(dry_run=dry_run)
+        final: dict[str, Any]
+        try:
+            while True:
+                line = next(stream)
+                notification = {
+                    "jsonrpc": "2.0",
+                    "method": "apply_progress",
+                    "params": {"line": line},
+                }
+                sys.stdout.write(json.dumps(notification, separators=(",", ":")) + "\n")
+                sys.stdout.flush()
+        except StopIteration as exc:
+            result = exc.value
+            final = result.to_dict() if hasattr(result, "to_dict") else dict(result)
+
+        return make_result(request.id, final).to_dict()
+
     def handle_request(self, request: JsonRpcRequest) -> dict[str, Any]:
         if self.debug:
             self.log.debug("RPC request: %s", request.method)
+
+        if request.method == "apply_updates_stream":
+            try:
+                return self._handle_apply_updates_stream(request)
+            except Exception as exc:  # noqa: BLE001
+                self.log.exception("RPC error in %s", request.method)
+                return make_error(request.id, INTERNAL_ERROR, str(exc)).to_dict()
 
         handler = self._handlers.get(request.method)
         if handler is None:
