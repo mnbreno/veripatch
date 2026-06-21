@@ -3,8 +3,8 @@
     Creates a desktop shortcut for the VeriPatch GUI.
 
 .DESCRIPTION
-    Creates VeriPatch.lnk on the desktop. The shortcut launches start-gui.ps1,
-    which starts the Python backend and wxLua GUI with the correct environment.
+    Creates VeriPatch.lnk on the desktop. The shortcut launches start-gui-hidden.vbs,
+    which starts the backend headlessly and opens the VeriPatch GUI window.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $ProjectRoot = (Resolve-Path (Join-Path $ScriptPath "..")).Path
 $GuiDir = Join-Path $ProjectRoot "gui"
-$StartScript = Join-Path $ScriptPath "start-gui.ps1"
+$LauncherVbs = Join-Path $ScriptPath "start-gui-hidden.vbs"
 $IconPath = Join-Path $GuiDir "assets\veripatch.ico"
 $ShortcutPath = Join-Path ([Environment]::GetFolderPath("Desktop")) "VeriPatch.lnk"
 
@@ -29,8 +29,8 @@ if (-not $PythonExe) {
     }
 }
 
-if (-not (Test-Path $StartScript)) {
-    Write-Error "Launcher script not found: $StartScript"
+if (-not (Test-Path $LauncherVbs)) {
+    Write-Error "Launcher script not found: $LauncherVbs"
     exit 1
 }
 
@@ -42,14 +42,10 @@ if (-not (Test-Path $IconPath)) {
     }
 }
 
-if (-not (Test-Path $IconPath)) {
-    Write-Warning "Icon not found at $IconPath; shortcut will use the default PowerShell icon."
-}
-
 $WshShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-$Shortcut.TargetPath = (Get-Command powershell.exe).Source
-$Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StartScript`""
+$Shortcut.TargetPath = (Get-Command wscript.exe).Source
+$Shortcut.Arguments = "`"$LauncherVbs`""
 $Shortcut.WorkingDirectory = $ProjectRoot
 $Shortcut.Description = "VeriPatch - Official Source Updates"
 
@@ -60,4 +56,4 @@ if (Test-Path $IconPath) {
 $Shortcut.Save()
 
 Write-Host "VeriPatch shortcut created at $ShortcutPath"
-Write-Host "Shortcut launches: $StartScript"
+Write-Host "Shortcut launches via: $LauncherVbs"

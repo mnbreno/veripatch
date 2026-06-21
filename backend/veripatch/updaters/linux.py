@@ -184,7 +184,12 @@ class LinuxUpdater(Updater):
     def apply_streaming(
         self,
         dry_run: bool = True,
+        *,
+        skip_package_ids: frozenset[str] | None = None,
+        package_ids: frozenset[str] | None = None,
     ) -> Generator[str, None, UpdateResult]:
+        _ = skip_package_ids
+        _ = package_ids
         pm = self._package_manager()
         if pm == PackageManager.UNKNOWN:
             return UpdateResult(

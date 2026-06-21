@@ -3,106 +3,129 @@
     Starts the VeriPatch backend and GUI.
 
 .DESCRIPTION
-    Launches a persistent TCP backend (optional) and the wxLua GUI.
-    Set VERIPATCH_PYTHON to override the Python executable.
-    Set VERIPATCH_IPC_PORT to connect the GUI to an existing backend.
+    Launches a persistent TCP backend (headless) and the wxLua GUI.
+    The backend runs without a console; the GUI window is shown normally.
+    Set VERIPATCH_PYTHON to override Python.
 #>
 
 $ErrorActionPreference = "Stop"
 
-$ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$ProjectRoot = (Resolve-Path (Join-Path $ScriptPath "..")).Path
-$BackendDir = Join-Path $ProjectRoot "backend"
-$GuiDir = Join-Path $ProjectRoot "gui"
+$LaunchLog = Join-Path $env:TEMP "veripatch-launch.log"
 
-$PythonExe = $env:VERIPATCH_PYTHON
-if (-not $PythonExe) {
-    $PythonCmd = Get-Command python.exe -ErrorAction SilentlyContinue
-    if ($PythonCmd) {
-        $PythonExe = $PythonCmd.Source
-    } else {
-        $Fallback = Join-Path $env:LOCALAPPDATA "Programs\Python\Python314\python.exe"
-        if (Test-Path $Fallback) {
-            $PythonExe = $Fallback
+function Write-LaunchLog {
+    param([string]$Message)
+    Add-Content -Path $LaunchLog -Value ("[{0}] {1}" -f (Get-Date -Format "s"), $Message)
+}
+
+try {
+    $ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
+    $ProjectRoot = (Resolve-Path (Join-Path $ScriptPath "..")).Path
+    $BackendDir = Join-Path $ProjectRoot "backend"
+    $GuiDir = Join-Path $ProjectRoot "gui"
+    $StartBackendScript = Join-Path $ScriptPath "start-backend.ps1"
+
+    $PythonExe = $env:VERIPATCH_PYTHON
+    if (-not $PythonExe) {
+        $PythonCmd = Get-Command python.exe -ErrorAction SilentlyContinue
+        if ($PythonCmd) {
+            $PythonExe = $PythonCmd.Source
         } else {
-            Write-Error "Python not found. Set VERIPATCH_PYTHON or install Python 3.11+."
-            exit 1
+            $Fallback = Join-Path $env:LOCALAPPDATA "Programs\Python\Python314\python.exe"
+            if (Test-Path $Fallback) {
+                $PythonExe = $Fallback
+            } else {
+                throw "Python not found. Set VERIPATCH_PYTHON or install Python 3.11+."
+            }
         }
     }
-}
 
-$LuaExe = $env:VERIPATCH_LUA
-if (-not $LuaExe) {
-    $BundledLua = Join-Path $ProjectRoot "tools\wxlua542\bin\64bit\lua.exe"
-    if (Test-Path $BundledLua) {
-        $LuaExe = $BundledLua
-    } else {
-        $LuaCmd = Get-Command lua.exe -ErrorAction SilentlyContinue
-        if ($LuaCmd) {
-            $LuaExe = $LuaCmd.Source
+    $LuaExe = $env:VERIPATCH_LUA
+    if (-not $LuaExe) {
+        $BundledDir = Join-Path $ProjectRoot "tools\wxlua542\bin\64bit"
+        $BundledWxLua = Join-Path $BundledDir "wxLua.exe"
+        $BundledLua = Join-Path $BundledDir "lua.exe"
+        if (Test-Path $BundledWxLua) {
+            $LuaExe = $BundledWxLua
+        } elseif (Test-Path $BundledLua) {
+            $LuaExe = $BundledLua
         } else {
-            Write-Error "Lua not found. Install Lua 5.4 + wxLua or set VERIPATCH_LUA."
-            exit 1
+            $LuaCmd = Get-Command wxLua.exe -ErrorAction SilentlyContinue
+            if ($LuaCmd) {
+                $LuaExe = $LuaCmd.Source
+            } else {
+                $LuaCmd = Get-Command lua.exe -ErrorAction SilentlyContinue
+                if ($LuaCmd) {
+                    $LuaExe = $LuaCmd.Source
+                } else {
+                    throw "Lua/wxLua not found. Install wxLua or set VERIPATCH_LUA."
+                }
+            }
         }
     }
-}
 
-$LuaBin = Split-Path -Parent $LuaExe
-if ($LuaBin -match "wxlua542\\bin\\64bit$") {
-    $env:PATH = "$LuaBin;$env:PATH"
-}
-$LuarocksShare = Join-Path $env:APPDATA "luarocks\share\lua\5.4"
-if (Test-Path $LuarocksShare) {
-    $env:LUA_PATH = "$LuarocksShare\?.lua;$LuarocksShare\?\init.lua;$env:LUA_PATH"
-}
-
-$Port = $env:VERIPATCH_IPC_PORT
-if (-not $Port) {
-    $Port = "8765"
-}
-
-$PortFile = Join-Path $BackendDir ".veripatch\ipc.port"
-$BackendProc = $null
-
-if (-not $env:VERIPATCH_SKIP_BACKEND) {
-    $BackendRunning = $false
-    try {
-        $BackendRunning = (Test-NetConnection -ComputerName 127.0.0.1 -Port $Port -WarningAction SilentlyContinue).TcpTestSucceeded
-    } catch {
-        $BackendRunning = $false
+    $LuaBin = Split-Path -Parent $LuaExe
+    if ($LuaBin -match "wxlua542\\bin\\64bit$") {
+        $env:PATH = "$LuaBin;$env:PATH"
+    }
+    $LuarocksShare = Join-Path $env:APPDATA "luarocks\share\lua\5.4"
+    if (Test-Path $LuarocksShare) {
+        $env:LUA_PATH = "$LuarocksShare\?.lua;$LuarocksShare\?\init.lua;$env:LUA_PATH"
     }
 
-    if (-not $BackendRunning) {
-        Write-Host "Starting VeriPatch backend on 127.0.0.1:$Port ..."
-        $BackendProc = Start-Process `
-            -FilePath $PythonExe `
-            -ArgumentList @("-m", "veripatch", "--port", $Port, "--write-port-file") `
-            -WorkingDirectory $BackendDir `
-            -PassThru `
-            -WindowStyle Hidden
-        Start-Sleep -Seconds 1
-    } else {
-        Write-Host "VeriPatch backend already running on 127.0.0.1:$Port"
+    $Port = $env:VERIPATCH_IPC_PORT
+    if (-not $Port) {
+        $Port = "8765"
     }
-}
 
-Write-Host "Launching VeriPatch GUI ..."
-$env:VERIPATCH_PYTHON = $PythonExe
-$env:VERIPATCH_IPC_PORT = $Port
-$GuiProc = Start-Process `
-    -FilePath $LuaExe `
-    -ArgumentList @("main.lua") `
-    -WorkingDirectory $GuiDir `
-    -PassThru
+    if (-not $env:VERIPATCH_SKIP_BACKEND) {
+        if ($env:VERIPATCH_KEEP_BACKEND -ne "1") {
+            Start-Process `
+                -FilePath "powershell.exe" `
+                -ArgumentList @(
+                    "-NoProfile",
+                    "-ExecutionPolicy", "Bypass",
+                    "-WindowStyle", "Hidden",
+                    "-File", $StartBackendScript,
+                    "-Port", $Port,
+                    "-ProjectRoot", $ProjectRoot,
+                    "-PythonExe", $PythonExe,
+                    "-Restart"
+                ) `
+                -WindowStyle Hidden | Out-Null
+            Start-Sleep -Seconds 1
+        } else {
+            $BackendRunning = $false
+            try {
+                $BackendRunning = (Test-NetConnection -ComputerName 127.0.0.1 -Port $Port -WarningAction SilentlyContinue).TcpTestSucceeded
+            } catch {
+                $BackendRunning = $false
+            }
 
-if ($GuiProc.ExitCode -and $GuiProc.ExitCode -ne 0) {
-    if ($BackendProc) {
-        Stop-Process -Id $BackendProc.Id -Force -ErrorAction SilentlyContinue
+            if (-not $BackendRunning) {
+                & $StartBackendScript -Port $Port -ProjectRoot $ProjectRoot -PythonExe $PythonExe
+                Start-Sleep -Seconds 1
+            }
+        }
     }
-    exit $GuiProc.ExitCode
-}
 
-Write-Host "VeriPatch GUI started (PID $($GuiProc.Id))."
-if ($BackendProc) {
-    Write-Host "Backend PID $($BackendProc.Id) listening on port $Port."
+    $env:VERIPATCH_PYTHON = $PythonExe
+    $env:VERIPATCH_IPC_PORT = $Port
+    $env:VERIPATCH_BACKEND_MANAGED = "1"
+    Write-LaunchLog "Starting GUI: $LuaExe in $GuiDir"
+
+    $GuiProc = Start-Process `
+        -FilePath $LuaExe `
+        -ArgumentList @("main.lua") `
+        -WorkingDirectory $GuiDir `
+        -PassThru
+
+    Start-Sleep -Milliseconds 800
+    if ($GuiProc.HasExited) {
+        throw "GUI exited immediately with code $($GuiProc.ExitCode). See wxLua output above or $LaunchLog"
+    }
+
+    Write-LaunchLog "GUI started (pid $($GuiProc.Id))"
+} catch {
+    Write-LaunchLog $_.Exception.Message
+    exit 1
 }
