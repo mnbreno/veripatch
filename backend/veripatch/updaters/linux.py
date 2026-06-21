@@ -184,7 +184,7 @@ class LinuxUpdater(Updater):
     def apply_streaming(
         self,
         dry_run: bool = True,
-    ) -> Generator[str | dict[str, Any], None, UpdateResult]:
+    ) -> Generator[str, None, UpdateResult]:
         pm = self._package_manager()
         if pm == PackageManager.UNKNOWN:
             return UpdateResult(
