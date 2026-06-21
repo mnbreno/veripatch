@@ -80,11 +80,17 @@ VeriPatch **never** downloads or installs software from unofficial sources. All 
 
 ## Status
 
-This is the **v0.1.0 foundation release**:
+**v0.2.0** adds real update execution infrastructure:
 
-- OS detection, source validation, and audit logging are fully implemented
-- Update execution is **stubbed** with dry-run support
-- Real privileged update execution is planned for a future iteration
+- `CommandRunner` with source validation, dry-run, timeouts, and audit logging
+- Real `list_updates` / `apply` via official CLIs (winget, softwareupdate, apt/dnf/pacman/zypper)
+- Elevation detection + UAC/sudo guidance; apply requires confirmation token
+- Structured logging (`VERIPATCH_LOG`), `diagnostics` JSON-RPC method
+- Headless GUI view-model tests via busted
+
+Set `VERIPATCH_DRY_RUN=1` to force dry-run mode for the backend IPC server.
+
+Real apply requires `confirm=true`, `confirm_token=veripatch-confirm-apply`, and elevated privileges.
 
 ## License
 

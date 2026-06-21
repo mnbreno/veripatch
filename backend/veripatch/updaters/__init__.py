@@ -15,17 +15,18 @@ def get_updater(
     os_info: OSInfo,
     validator: SourceValidator | None = None,
     audit_logger: AuditLogger | None = None,
+    dry_run: bool = False,
 ) -> Updater:
     """Return the appropriate updater for the detected operating system."""
     validator = validator or SourceValidator(audit_logger)
     audit = audit_logger or AuditLogger()
 
     if os_info.os_type == OSType.WINDOWS:
-        return WindowsUpdater(os_info, validator, audit)
+        return WindowsUpdater(os_info, validator, audit, dry_run=dry_run)
     if os_info.os_type == OSType.MACOS:
-        return MacOSUpdater(os_info, validator, audit)
+        return MacOSUpdater(os_info, validator, audit, dry_run=dry_run)
     if os_info.os_type == OSType.LINUX:
-        return LinuxUpdater(os_info, validator, audit)
+        return LinuxUpdater(os_info, validator, audit, dry_run=dry_run)
 
     raise ValueError(f"No updater available for OS type: {os_info.os_type.value}")
 

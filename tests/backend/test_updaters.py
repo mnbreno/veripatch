@@ -1,4 +1,4 @@
-"""Tests for OS-specific updaters."""
+"""Updated updater tests with dry-run mode."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def test_get_updater_windows(validator: SourceValidator, audit: AuditLogger) -> 
         release="10",
         architecture="AMD64",
     )
-    updater = get_updater(info, validator, audit)
+    updater = get_updater(info, validator, audit, dry_run=True)
     assert isinstance(updater, WindowsUpdater)
 
 
@@ -43,7 +43,7 @@ def test_get_updater_macos(validator: SourceValidator, audit: AuditLogger) -> No
         release="23",
         architecture="arm64",
     )
-    updater = get_updater(info, validator, audit)
+    updater = get_updater(info, validator, audit, dry_run=True)
     assert isinstance(updater, MacOSUpdater)
 
 
@@ -56,21 +56,20 @@ def test_get_updater_linux(validator: SourceValidator, audit: AuditLogger) -> No
         distro_id="ubuntu",
         package_manager=PackageManager.APT,
     )
-    updater = get_updater(info, validator, audit)
+    updater = get_updater(info, validator, audit, dry_run=True)
     assert isinstance(updater, LinuxUpdater)
 
 
-def test_windows_list_updates_stub(validator: SourceValidator, audit: AuditLogger) -> None:
+def test_windows_list_updates_dry_run(validator: SourceValidator, audit: AuditLogger) -> None:
     info = OSInfo(
         os_type=OSType.WINDOWS,
         version="10.0",
         release="10",
         architecture="AMD64",
     )
-    updater = get_updater(info, validator, audit)
+    updater = get_updater(info, validator, audit, dry_run=True)
     result = updater.list_updates()
     assert result.success
-    assert len(result.items) >= 1
     assert result.dry_run
 
 
@@ -81,10 +80,35 @@ def test_windows_apply_dry_run(validator: SourceValidator, audit: AuditLogger) -
         release="10",
         architecture="AMD64",
     )
-    updater = get_updater(info, validator, audit)
+    updater = get_updater(info, validator, audit, dry_run=True)
     result = updater.apply(dry_run=True)
     assert result.success
     assert result.dry_run
+
+
+def test_macos_list_updates_dry_run(validator: SourceValidator, audit: AuditLogger) -> None:
+    info = OSInfo(
+        os_type=OSType.MACOS,
+        version="14.0",
+        release="23",
+        architecture="arm64",
+    )
+    updater = get_updater(info, validator, audit, dry_run=True)
+    result = updater.list_updates()
+    assert result.success
+
+
+def test_linux_list_updates_dry_run(validator: SourceValidator, audit: AuditLogger) -> None:
+    info = OSInfo(
+        os_type=OSType.LINUX,
+        version="6.0",
+        release="6.0",
+        architecture="x86_64",
+        package_manager=PackageManager.APT,
+    )
+    updater = get_updater(info, validator, audit, dry_run=True)
+    result = updater.list_updates()
+    assert result.success
 
 
 def test_linux_unknown_pm_fails(validator: SourceValidator, audit: AuditLogger) -> None:
@@ -95,7 +119,7 @@ def test_linux_unknown_pm_fails(validator: SourceValidator, audit: AuditLogger) 
         architecture="x86_64",
         package_manager=PackageManager.UNKNOWN,
     )
-    updater = get_updater(info, validator, audit)
+    updater = get_updater(info, validator, audit, dry_run=True)
     result = updater.list_updates()
     assert not result.success
 
@@ -115,6 +139,6 @@ def test_current_os_updater_routing(validator: SourceValidator, audit: AuditLogg
     info = detect_os()
     if info.os_type == OSType.UNKNOWN:
         pytest.skip("Unknown OS")
-    updater = get_updater(info, validator, audit)
+    updater = get_updater(info, validator, audit, dry_run=True)
     check = updater.check()
-    assert check.success or not check.success  # routing works without crash
+    assert check.success or not check.success

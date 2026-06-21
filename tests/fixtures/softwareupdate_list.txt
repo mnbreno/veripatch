@@ -1,0 +1,5 @@
+Software Update Tool
+
+Finding available software
+* Label: macOS-14.5-Update
+	Title: macOS Sonoma 14.5, Version: 14.5, Size: 1234K, Recommended: YES

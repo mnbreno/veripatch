@@ -1,0 +1,8 @@
+return {
+  default = {
+    verbose = true,
+    coverage = false,
+    pattern = "_spec",
+    ROOT = {"gui"},
+  },
+}

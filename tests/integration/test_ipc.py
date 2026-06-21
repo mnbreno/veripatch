@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
+IPC_ENV = {**os.environ, "VERIPATCH_DRY_RUN": "1", "PYTHONPATH": str(BACKEND_DIR)}
 
 
 def _run_rpc(method: str, params: dict | None = None, req_id: int = 1) -> dict:
@@ -20,7 +22,8 @@ def _run_rpc(method: str, params: dict | None = None, req_id: int = 1) -> dict:
         capture_output=True,
         text=True,
         cwd=str(BACKEND_DIR),
-        timeout=10,
+        timeout=30,
+        env=IPC_ENV,
     )
     assert proc.returncode == 0, proc.stderr
     lines = [ln for ln in proc.stdout.strip().splitlines() if ln.strip()]
@@ -57,6 +60,18 @@ def test_ipc_apply_updates_dry_run() -> None:
     response = _run_rpc("apply_updates", {"dry_run": True})
     result = response["result"]
     assert result["dry_run"] is True
+
+
+def test_ipc_apply_rejected_without_confirmation() -> None:
+    response = _run_rpc("apply_updates", {"dry_run": False, "confirm": False})
+    result = response["result"]
+    assert result["success"] is False
+
+
+def test_ipc_diagnostics() -> None:
+    response = _run_rpc("diagnostics")
+    assert "version" in response["result"]
+    assert "capabilities" in response["result"]
 
 
 def test_ipc_unknown_method() -> None:

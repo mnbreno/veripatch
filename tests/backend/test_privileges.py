@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from veripatch.privileges.audit import AuditLogger
 from veripatch.privileges.elevation import is_elevated, request_elevation
@@ -12,8 +13,10 @@ def test_is_elevated_returns_bool() -> None:
     assert isinstance(is_elevated(), bool)
 
 
-def test_request_elevation_stub_returns_false() -> None:
-    assert request_elevation() is False
+def test_request_elevation_when_not_elevated() -> None:
+    with patch("veripatch.privileges.elevation.is_elevated", return_value=False):
+        with patch("veripatch.privileges.elevation.sys.platform", "linux"):
+            assert request_elevation() is False
 
 
 def test_audit_logger_append_only(tmp_path: Path) -> None:

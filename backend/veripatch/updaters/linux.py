@@ -1,8 +1,14 @@
-"""Linux updater using distro-native package managers (stubbed)."""
+"""Linux updater using distro-native package managers."""
 
 from __future__ import annotations
 
 from veripatch.detection.os_detect import PackageManager
+from veripatch.execution.parsers import (
+    parse_apt_upgradable,
+    parse_dnf_check_update,
+    parse_pacman_qu,
+    parse_zypper_list_updates,
+)
 from veripatch.updaters.base import UpdateItem, Updater, UpdateResult, UpdateStatus
 
 _PM_SOURCE_ID: dict[PackageManager, str] = {
@@ -20,10 +26,24 @@ _PM_CHECK_CMD: dict[PackageManager, list[str]] = {
 }
 
 _PM_APPLY_CMD: dict[PackageManager, list[str]] = {
+    PackageManager.APT: ["apt", "upgrade", "-y"],
+    PackageManager.DNF: ["dnf", "upgrade", "-y"],
+    PackageManager.PACMAN: ["pacman", "-Su", "--noconfirm"],
+    PackageManager.ZYPPER: ["zypper", "update", "-y"],
+}
+
+_PM_APPLY_VALIDATE: dict[PackageManager, list[str]] = {
     PackageManager.APT: ["apt", "upgrade"],
     PackageManager.DNF: ["dnf", "upgrade"],
     PackageManager.PACMAN: ["pacman", "-Su"],
     PackageManager.ZYPPER: ["zypper", "update"],
+}
+
+_PM_PARSER = {
+    PackageManager.APT: parse_apt_upgradable,
+    PackageManager.DNF: parse_dnf_check_update,
+    PackageManager.PACMAN: parse_pacman_qu,
+    PackageManager.ZYPPER: parse_zypper_list_updates,
 }
 
 
@@ -31,8 +51,7 @@ class LinuxUpdater(Updater):
     """Linux update workflow via distro-native package managers."""
 
     def _package_manager(self) -> PackageManager:
-        pm = self.os_info.package_manager or PackageManager.UNKNOWN
-        return pm
+        return self.os_info.package_manager or PackageManager.UNKNOWN
 
     def _source_id(self) -> str:
         return _PM_SOURCE_ID.get(self._package_manager(), "unknown")
@@ -42,23 +61,25 @@ class LinuxUpdater(Updater):
         if pm == PackageManager.UNKNOWN:
             return UpdateResult(
                 success=False,
-                dry_run=True,
+                dry_run=self.dry_run,
                 message="Unknown Linux package manager",
                 errors=["Could not determine distro-native package manager"],
             )
         cmd = _PM_CHECK_CMD[pm]
-        self.audit.log_action("linux_updater_check", {"package_manager": pm.value, "stub": True})
+        self.audit.log_action("linux_updater_check", {"package_manager": pm.value})
         if not self._validate(cmd):
             return UpdateResult(
                 success=False,
-                dry_run=True,
+                dry_run=self.dry_run,
                 message=f"{pm.value} source validation failed",
                 errors=["Official source validation rejected command"],
             )
+        result = self.runner.run(cmd)
         return UpdateResult(
-            success=True,
-            dry_run=True,
-            message=f"Linux update sources validated via {pm.value} (stub)",
+            success=result.success or result.dry_run,
+            dry_run=result.dry_run,
+            message=result.message,
+            errors=[] if result.success else [result.stderr or result.message],
         )
 
     def list_updates(self) -> UpdateResult:
@@ -66,7 +87,7 @@ class LinuxUpdater(Updater):
         if pm == PackageManager.UNKNOWN:
             return UpdateResult(
                 success=False,
-                dry_run=True,
+                dry_run=self.dry_run,
                 message="Unknown Linux package manager",
                 errors=["Could not determine distro-native package manager"],
             )
@@ -74,24 +95,34 @@ class LinuxUpdater(Updater):
         if not self._validate(cmd):
             return UpdateResult(
                 success=False,
-                dry_run=True,
+                dry_run=self.dry_run,
                 message="Cannot list updates: source validation failed",
                 errors=["Rejected non-official command"],
             )
-        items = [
-            UpdateItem(
-                id=f"linux-stub-{pm.value}",
-                title=f"[Stub] {pm.value.upper()} package updates available",
-                source_id=self._source_id(),
-                status=UpdateStatus.AVAILABLE,
-                metadata={"stub": True, "package_manager": pm.value},
-            ),
-        ]
+        result = self.runner.run(cmd)
+        source_id = self._source_id()
+        if result.dry_run:
+            return UpdateResult(
+                success=True,
+                dry_run=True,
+                message=result.message,
+                items=[
+                    UpdateItem(
+                        id=f"linux-dry-run-{pm.value}",
+                        title=f"[Dry-run] {pm.value.upper()} updates would be listed",
+                        source_id=source_id,
+                        status=UpdateStatus.AVAILABLE,
+                    )
+                ],
+            )
+        parser = _PM_PARSER[pm]
+        items = parser(result.stdout, source_id)
         return UpdateResult(
-            success=True,
-            dry_run=True,
-            message=f"Listed Linux updates via {pm.value} (stub)",
+            success=result.success,
+            dry_run=False,
+            message=f"Listed {len(items)} Linux update(s) via {pm.value}",
             items=items,
+            errors=[] if result.success else [result.stderr or result.message],
         )
 
     def apply(self, dry_run: bool = True) -> UpdateResult:
@@ -106,29 +137,44 @@ class LinuxUpdater(Updater):
         cmd = _PM_APPLY_CMD[pm]
         self.audit.log_action(
             "linux_apply_updates",
-            {"package_manager": pm.value, "dry_run": dry_run, "stub": True},
+            {"package_manager": pm.value, "dry_run": dry_run},
         )
-        if not self._validate(cmd):
+        if not self._validate(_PM_APPLY_VALIDATE[pm]):
             return UpdateResult(
                 success=False,
                 dry_run=dry_run,
                 message="Apply rejected: command not from official source",
                 errors=[f"Validation failed for {pm.value} upgrade command"],
             )
+
+        result = self.runner.run(cmd, dry_run=dry_run)
+        source_id = self._source_id()
         if dry_run:
             return UpdateResult(
                 success=True,
                 dry_run=True,
-                message=f"Dry-run: would apply updates via {pm.value}",
+                message=result.message,
                 items=[
                     UpdateItem(
-                        id=f"linux-stub-{pm.value}",
+                        id=f"linux-apply-dry-run-{pm.value}",
                         title=f"[Dry-run] {pm.value.upper()} system upgrade",
-                        source_id=self._source_id(),
+                        source_id=source_id,
                         status=UpdateStatus.PENDING,
                     )
                 ],
             )
-        raise NotImplementedError(
-            "Real Linux update execution is not yet implemented. Use dry_run=True."
+
+        return UpdateResult(
+            success=result.success,
+            dry_run=False,
+            message=result.message,
+            items=[
+                UpdateItem(
+                    id=f"linux-applied-{pm.value}",
+                    title=f"{pm.value.upper()} upgrade executed",
+                    source_id=source_id,
+                    status=UpdateStatus.APPLIED if result.success else UpdateStatus.FAILED,
+                )
+            ],
+            errors=[] if result.success else [result.stderr or "Apply failed"],
         )

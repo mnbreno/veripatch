@@ -1,7 +1,10 @@
-"""Windows updater using official WUA and WinGet sources (stubbed)."""
+"""Windows updater using official WUA and WinGet sources."""
 
 from __future__ import annotations
 
+import shutil
+
+from veripatch.execution.parsers import parse_winget_upgrade
 from veripatch.updaters.base import UpdateItem, Updater, UpdateResult, UpdateStatus
 
 
@@ -11,61 +14,110 @@ class WindowsUpdater(Updater):
     SOURCE_WUA = "windows_update_agent"
     SOURCE_WINGET = "winget"
 
-    def check(self) -> UpdateResult:
-        self.audit.log_action("windows_updater_check", {"stub": True})
-        commands = [
-            ["winget", "list"],
-        ]
-        for cmd in commands:
-            if not self._validate(cmd):
-                return UpdateResult(
-                    success=False,
-                    dry_run=True,
-                    message="WinGet source validation failed",
-                    errors=["Official source validation rejected command"],
+    def _winget_available(self) -> bool:
+        return shutil.which("winget") is not None
+
+    def _list_wua_updates(self) -> list[UpdateItem]:
+        """Optional WUA COM path when pywin32 is available."""
+        try:
+            import win32com.client  # type: ignore[import-untyped]
+        except ImportError:
+            return []
+
+        items: list[UpdateItem] = []
+        try:
+            session = win32com.client.Dispatch("Microsoft.Update.Session")
+            searcher = session.CreateUpdateSearcher()
+            result = searcher.Search("IsInstalled=0")
+            for i in range(result.Updates.Count):
+                update = result.Updates.Item(i)
+                title = str(update.Title)
+                update_id = str(update.Identity.UpdateID)
+                items.append(
+                    UpdateItem(
+                        id=f"wua-{update_id[:16]}",
+                        title=title,
+                        source_id=self.SOURCE_WUA,
+                        status=UpdateStatus.AVAILABLE,
+                        severity="important",
+                        metadata={"update_id": update_id},
+                    )
                 )
+        except Exception:  # noqa: BLE001 - COM may be unavailable in CI
+            return []
+        return items
+
+    def check(self) -> UpdateResult:
+        self.audit.log_action("windows_updater_check", {})
+        if not self._winget_available():
+            wua_items = self._list_wua_updates()
+            if wua_items:
+                return UpdateResult(
+                    success=True,
+                    dry_run=self.dry_run,
+                    message="Windows Update Agent available",
+                )
+            return UpdateResult(
+                success=False,
+                dry_run=self.dry_run,
+                message="Neither winget nor WUA COM available",
+                errors=["Install WinGet or ensure Windows Update Agent is accessible"],
+            )
+        cmd = ["winget", "upgrade", "--disable-interactivity"]
+        if not self._validate(cmd):
+            return UpdateResult(
+                success=False,
+                dry_run=self.dry_run,
+                message="WinGet source validation failed",
+                errors=["Official source validation rejected command"],
+            )
+        result = self.runner.run(cmd)
         return UpdateResult(
-            success=True,
-            dry_run=True,
-            message="Windows update sources validated (stub)",
+            success=result.success or result.dry_run,
+            dry_run=result.dry_run,
+            message=result.message,
+            errors=[] if result.success else [result.stderr or result.message],
         )
 
     def list_updates(self) -> UpdateResult:
-        self.audit.log_action("windows_list_updates", {"stub": True})
-        if not self._validate(["winget", "list"]):
-            return UpdateResult(
-                success=False,
-                dry_run=True,
-                message="Cannot list updates: source validation failed",
-                errors=["Rejected non-official command"],
-            )
-        # Stub: return placeholder updates
-        items = [
-            UpdateItem(
-                id="wua-kb-stub",
-                title="[Stub] Windows Update Agent security update",
-                source_id=self.SOURCE_WUA,
-                status=UpdateStatus.AVAILABLE,
-                severity="important",
-                metadata={"stub": True},
-            ),
-            UpdateItem(
-                id="winget-stub",
-                title="[Stub] WinGet package updates available",
-                source_id=self.SOURCE_WINGET,
-                status=UpdateStatus.AVAILABLE,
-                metadata={"stub": True},
-            ),
-        ]
+        self.audit.log_action("windows_list_updates", {})
+        items: list[UpdateItem] = []
+
+        if self._winget_available():
+            cmd = ["winget", "upgrade", "--disable-interactivity"]
+            if self._validate(cmd):
+                result = self.runner.run(cmd)
+                if result.dry_run:
+                    items.append(
+                        UpdateItem(
+                            id="winget-dry-run",
+                            title="[Dry-run] WinGet upgrades would be listed",
+                            source_id=self.SOURCE_WINGET,
+                            status=UpdateStatus.AVAILABLE,
+                        )
+                    )
+                elif result.success:
+                    items.extend(parse_winget_upgrade(result.stdout, self.SOURCE_WINGET))
+
+        items.extend(self._list_wua_updates())
+
         return UpdateResult(
             success=True,
-            dry_run=True,
-            message="Listed Windows updates (stub)",
+            dry_run=self.dry_run,
+            message=f"Listed {len(items)} Windows update(s)",
             items=items,
         )
 
     def apply(self, dry_run: bool = True) -> UpdateResult:
-        self.audit.log_action("windows_apply_updates", {"dry_run": dry_run, "stub": True})
+        self.audit.log_action("windows_apply_updates", {"dry_run": dry_run})
+        cmd = [
+            "winget",
+            "upgrade",
+            "--all",
+            "--disable-interactivity",
+            "--accept-package-agreements",
+            "--accept-source-agreements",
+        ]
         if not self._validate(["winget", "upgrade", "--all"]):
             return UpdateResult(
                 success=False,
@@ -73,21 +125,34 @@ class WindowsUpdater(Updater):
                 message="Apply rejected: command not from official source",
                 errors=["Validation failed for winget upgrade"],
             )
+
+        result = self.runner.run(cmd, dry_run=dry_run)
         if dry_run:
             return UpdateResult(
                 success=True,
                 dry_run=True,
-                message="Dry-run: would apply Windows updates via official sources",
+                message=result.message,
                 items=[
                     UpdateItem(
-                        id="wua-kb-stub",
-                        title="[Dry-run] Windows Update Agent update",
-                        source_id=self.SOURCE_WUA,
+                        id="winget-apply-dry-run",
+                        title="[Dry-run] WinGet upgrade --all",
+                        source_id=self.SOURCE_WINGET,
                         status=UpdateStatus.PENDING,
                     )
                 ],
             )
-        # Real execution deferred to future iteration
-        raise NotImplementedError(
-            "Real Windows update execution is not yet implemented. Use dry_run=True."
+
+        return UpdateResult(
+            success=result.success,
+            dry_run=False,
+            message=result.message,
+            items=[
+                UpdateItem(
+                    id="winget-applied",
+                    title="WinGet upgrade --all executed",
+                    source_id=self.SOURCE_WINGET,
+                    status=UpdateStatus.APPLIED if result.success else UpdateStatus.FAILED,
+                )
+            ],
+            errors=[] if result.success else [result.stderr or "Apply failed"],
         )

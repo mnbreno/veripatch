@@ -8,6 +8,7 @@ from enum import StrEnum
 from typing import Any
 
 from veripatch.detection.os_detect import OSInfo
+from veripatch.execution.runner import CommandRunner
 from veripatch.privileges.audit import AuditLogger
 from veripatch.sources.validator import SourceValidator
 
@@ -70,10 +71,19 @@ class Updater(ABC):
         os_info: OSInfo,
         validator: SourceValidator | None = None,
         audit_logger: AuditLogger | None = None,
+        runner: CommandRunner | None = None,
+        dry_run: bool = False,
     ) -> None:
         self.os_info = os_info
         self.validator = validator or SourceValidator()
         self.audit = audit_logger or AuditLogger()
+        self.dry_run = dry_run
+        self.runner = runner or CommandRunner(
+            os_info,
+            self.validator,
+            self.audit,
+            dry_run=dry_run,
+        )
 
     @abstractmethod
     def check(self) -> UpdateResult:

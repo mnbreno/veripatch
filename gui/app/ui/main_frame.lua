@@ -1,6 +1,8 @@
 -- VeriPatch main application frame (wxLua)
 
 local ipc = require("app.ipc.client")
+local ViewModel = require("app.ui.view_model")
+local config = require("app.config")
 
 local MainFrame = {}
 MainFrame.__index = MainFrame
@@ -15,6 +17,9 @@ function MainFrame.new(parent, backend_config)
   self.updates_list = nil
   self.status_label = nil
   self.apply_btn = nil
+  self.apply_dry_run = true
+  self.apply_confirmed = false
+  self.elevated = false
   self.ipc_client = ipc.new(
     backend_config.python_cmd or "python",
     backend_config.args or {"-m", "veripatch"},
@@ -37,32 +42,28 @@ function MainFrame:build()
   local panel = wx.wxPanel(self.frame, wx.wxID_ANY)
   local sizer = wx.wxBoxSizer(wx.wxVERTICAL)
 
-  -- OS info section
   local os_box = wx.wxStaticBox(panel, wx.wxID_ANY, "System Information")
   local os_sizer = wx.wxStaticBoxSizer(os_box, wx.wxVERTICAL)
   self.os_label = wx.wxStaticText(panel, wx.wxID_ANY, "Detecting operating system...")
   os_sizer:Add(self.os_label, 0, wx.wxALL, 5)
 
-  -- Official sources section
   local src_box = wx.wxStaticBox(panel, wx.wxID_ANY, "Official Update Sources")
   local src_sizer = wx.wxStaticBoxSizer(src_box, wx.wxVERTICAL)
   self.sources_list = wx.wxListBox(panel, wx.wxID_ANY)
   src_sizer:Add(self.sources_list, 1, wx.wxEXPAND + wx.wxALL, 5)
 
-  -- Available updates section
   local upd_box = wx.wxStaticBox(panel, wx.wxID_ANY, "Available Updates")
   local upd_sizer = wx.wxStaticBoxSizer(upd_box, wx.wxVERTICAL)
   self.updates_list = wx.wxListBox(panel, wx.wxID_ANY)
   upd_sizer:Add(self.updates_list, 2, wx.wxEXPAND + wx.wxALL, 5)
 
-  -- Action buttons
   local btn_sizer = wx.wxBoxSizer(wx.wxHORIZONTAL)
   local refresh_btn = wx.wxButton(panel, wx.wxID_ANY, "Refresh")
-  self.apply_btn = wx.wxButton(panel, wx.wxID_ANY, "Apply (Dry Run)")
+  self.apply_btn = wx.wxButton(panel, wx.wxID_ANY, ViewModel.apply_button_label(true))
   btn_sizer:Add(refresh_btn, 0, wx.wxRIGHT, 5)
   btn_sizer:Add(self.apply_btn, 0)
 
-  self.status_label = wx.wxStaticText(panel, wx.wxID_ANY, "Ready")
+  self.status_label = wx.wxStaticText(panel, wx.wxID_ANY, ViewModel.STATUS.READY)
 
   sizer:Add(os_sizer, 0, wx.wxEXPAND + wx.wxALL, 5)
   sizer:Add(src_sizer, 1, wx.wxEXPAND + wx.wxLEFT + wx.wxRIGHT, 5)
@@ -77,7 +78,7 @@ function MainFrame:build()
   end)
 
   self.apply_btn:Connect(wx.wxEVT_COMMAND_BUTTON_CLICKED, function()
-    self:apply_dry_run()
+    self:apply_updates()
   end)
 
   self.frame:Connect(wx.wxEVT_CLOSE_WINDOW, function()
@@ -99,62 +100,58 @@ function MainFrame:set_status(msg)
   end
 end
 
-function MainFrame:refresh()
-  self:set_status("Connecting to backend...")
-
-  local os_result, os_err = self.ipc_client:call("detect_os")
-  if not os_result then
-    self.os_label:SetLabel("Backend error: " .. tostring(os_err))
-    self:set_status("Failed to detect OS")
-    return
-  end
-
-  local os = os_result.os
-  local elevated = os_result.elevated and "Yes" or "No"
-  local os_text = string.format(
-    "OS: %s | Version: %s | Arch: %s | Elevated: %s",
-    os.os_type or "?",
-    os.version or "?",
-    os.architecture or "?",
-    elevated
-  )
-  if os.distro_name then
-    os_text = os_text .. " | Distro: " .. os.distro_name
-  end
-  self.os_label:SetLabel(os_text)
-
-  self.sources_list:Clear()
-  local src_result, src_err = self.ipc_client:call("list_sources")
-  if src_result and src_result.sources then
-    for _, source in ipairs(src_result.sources) do
-      self.sources_list:Append(source.name .. " (" .. source.id .. ")")
-    end
-  else
-    self.sources_list:Append("Failed to load sources: " .. tostring(src_err))
-  end
-
-  self.updates_list:Clear()
-  local upd_result, upd_err = self.ipc_client:call("check_updates")
-  if upd_result and upd_result.updates and upd_result.updates.items then
-    for _, item in ipairs(upd_result.updates.items) do
-      self.updates_list:Append(item.title .. " [" .. item.source_id .. "]")
-    end
-    self:set_status("Updates loaded (stub data in foundation release)")
-  else
-    self.updates_list:Append("Failed to check updates: " .. tostring(upd_err))
-    self:set_status("Update check failed")
+function MainFrame:_set_listbox_items(listbox, rows)
+  listbox:Clear()
+  for _, row in ipairs(rows) do
+    listbox:Append(row)
   end
 end
 
-function MainFrame:apply_dry_run()
-  self:set_status("Applying updates (dry run)...")
-  local result, err = self.ipc_client:call("apply_updates", { dry_run = true })
-  if result then
-    local count = result.items and #result.items or 0
-    self:set_status(string.format("Dry run complete: %s (%d items)", result.message, count))
-  else
-    self:set_status("Dry run failed: " .. tostring(err))
+function MainFrame:refresh()
+  self:set_status(ViewModel.STATUS.CONNECTING)
+
+  local os_result, os_err = self.ipc_client:call("detect_os")
+  local os_text, os_status = ViewModel.format_os_label(os_result, os_err)
+  self.os_label:SetLabel(os_text)
+  if os_status then
+    self:set_status(os_status)
+    return
   end
+  self.elevated = os_result.elevated == true
+
+  local src_result, src_err = self.ipc_client:call("list_sources")
+  local source_rows = ViewModel.format_source_rows(src_result, src_err)
+  self:_set_listbox_items(self.sources_list, source_rows)
+
+  local upd_result, upd_err = self.ipc_client:call("check_updates")
+  local update_rows, upd_status = ViewModel.format_update_rows(upd_result, upd_err)
+  self:_set_listbox_items(self.updates_list, update_rows)
+  self:set_status(upd_status or ViewModel.STATUS.LOADED)
+end
+
+function MainFrame:apply_updates()
+  local dry_run = self.apply_dry_run
+  if not dry_run then
+    local ok, reason = ViewModel.can_apply_real(
+      self.elevated,
+      self.apply_confirmed,
+      config.APPLY_CONFIRMATION_TOKEN
+    )
+    if not ok then
+      self:set_status(reason)
+      return
+    end
+  end
+
+  self:set_status(dry_run and "Applying updates (dry run)..." or "Applying updates...")
+
+  local params = ViewModel.build_apply_params(
+    dry_run,
+    self.apply_confirmed,
+    config.APPLY_CONFIRMATION_TOKEN
+  )
+  local result, err = self.ipc_client:call("apply_updates", params)
+  self:set_status(ViewModel.format_apply_status(result, err, dry_run))
 end
 
 return MainFrame
