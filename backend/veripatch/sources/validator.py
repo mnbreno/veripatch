@@ -97,24 +97,22 @@ class SourceValidator:
 
         if source.allowed_args_prefixes and len(command) > 1:
             first_arg = command[1]
-            if not any(first_arg.startswith(prefix) or first_arg == prefix.lstrip("-")
+            if not any(first_arg == prefix or first_arg.startswith(prefix)
                        for prefix in source.allowed_args_prefixes):
-                # Check prefix match more simply
-                if not _args_allowed(first_arg, source.allowed_args_prefixes):
-                    outcome = ValidationOutcome(
-                        result=ValidationResult.REJECTED,
-                        source=source,
-                        reason=(
-                            f"Argument '{first_arg}' is not in allowed prefixes "
-                            f"for source '{source.id}'"
-                        ),
-                        command=tuple(command),
-                    )
-                    self._audit.log_rejection(
-                        outcome.reason,
-                        {"command": list(command), "source": source.id},
-                    )
-                    return outcome
+                outcome = ValidationOutcome(
+                    result=ValidationResult.REJECTED,
+                    source=source,
+                    reason=(
+                        f"Argument '{first_arg}' is not in allowed prefixes "
+                        f"for source '{source.id}'"
+                    ),
+                    command=tuple(command),
+                )
+                self._audit.log_rejection(
+                    outcome.reason,
+                    {"command": list(command), "source": source.id},
+                )
+                return outcome
 
         outcome = ValidationOutcome(
             result=ValidationResult.APPROVED,
@@ -125,12 +123,3 @@ class SourceValidator:
         self._audit.log_approval(source.id, {"command": list(command)})
         return outcome
 
-
-def _args_allowed(first_arg: str, prefixes: tuple[str, ...]) -> bool:
-    for prefix in prefixes:
-        if first_arg == prefix or first_arg.startswith(prefix):
-            return True
-        # Handle pacman-style combined flags
-        if prefix.startswith("-") and first_arg.startswith(prefix[0]):
-            return True
-    return False

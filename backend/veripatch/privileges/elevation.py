@@ -20,13 +20,7 @@ def is_elevated() -> bool:
         except (AttributeError, OSError):
             return False
 
-    if sys.platform == "darwin":
-        geteuid = getattr(os, "geteuid", None)
-        if geteuid is not None:
-            return geteuid() == 0
-        return False
-
-    if sys.platform.startswith("linux"):
+    if sys.platform in ("darwin", "linux"):
         geteuid = getattr(os, "geteuid", None)
         if geteuid is not None:
             return geteuid() == 0
@@ -84,27 +78,17 @@ def request_elevation(
                 audit_logger.log_action("elevation_failed", {"error": str(exc)})
             return False
 
-    if sys.platform == "darwin":
+    if sys.platform in ("darwin", "linux"):
         if audit_logger:
-            audit_logger.log_action(
-                "elevation_guidance",
-                {
-                    "message": "Re-run with sudo for privileged updates",
-                    "suggested": f"sudo {cmd_line}",
-                },
-            )
-        return False
-
-    if sys.platform.startswith("linux"):
-        if audit_logger:
-            audit_logger.log_action(
-                "elevation_guidance",
-                {
-                    "message": "Re-run with sudo or pkexec for privileged updates",
-                    "suggested_sudo": f"sudo {cmd_line}",
-                    "suggested_pkexec": f"pkexec {sys.executable} {' '.join(args[1:])}",
-                },
-            )
+            details: dict[str, str] = {
+                "message": "Re-run with sudo for privileged updates",
+                "suggested_sudo": f"sudo {cmd_line}",
+            }
+            if sys.platform.startswith("linux"):
+                details["suggested_pkexec"] = (
+                    f"pkexec {sys.executable} {' '.join(args[1:])}"
+                )
+            audit_logger.log_action("elevation_guidance", details)
         return False
 
     return False

@@ -49,34 +49,24 @@ class WindowsUpdater(Updater):
 
     def check(self) -> UpdateResult:
         self.audit.log_action("windows_updater_check", {})
-        if not self._winget_available():
-            wua_items = self._list_wua_updates()
-            if wua_items:
-                return UpdateResult(
-                    success=True,
-                    dry_run=self.dry_run,
-                    message="Windows Update Agent available",
-                )
+        if self._winget_available():
             return UpdateResult(
-                success=False,
+                success=True,
                 dry_run=self.dry_run,
-                message="Neither winget nor WUA COM available",
-                errors=["Install WinGet or ensure Windows Update Agent is accessible"],
+                message="WinGet is available",
             )
-        cmd = ["winget", "upgrade", "--disable-interactivity"]
-        if not self._validate(cmd):
+        wua_items = self._list_wua_updates()
+        if wua_items:
             return UpdateResult(
-                success=False,
+                success=True,
                 dry_run=self.dry_run,
-                message="WinGet source validation failed",
-                errors=["Official source validation rejected command"],
+                message="Windows Update Agent available",
             )
-        result = self.runner.run(cmd)
         return UpdateResult(
-            success=result.success or result.dry_run,
-            dry_run=result.dry_run,
-            message=result.message,
-            errors=[] if result.success else [result.stderr or result.message],
+            success=False,
+            dry_run=self.dry_run,
+            message="Neither winget nor WUA COM available",
+            errors=["Install WinGet or ensure Windows Update Agent is accessible"],
         )
 
     def list_updates(self) -> UpdateResult:

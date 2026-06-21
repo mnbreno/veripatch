@@ -9,6 +9,7 @@
 - **Source validation** — Blocks third-party or unofficial update channels with audit logging
 - **Native GUI** — wxLua desktop interface with update listing and dry-run apply
 - **JSON-RPC backend** — Line-delimited IPC between GUI and Python backend
+- **AgentMesh** — Optional multi-agent dev tooling for design review and CI workflows
 - **CI/CD** — Cross-platform automated testing on every pull request
 
 ## Architecture
@@ -16,6 +17,7 @@
 ```
 gui/          wxLua frontend (native widgets)
 backend/      Python backend (veripatch package)
+agentmesh/    Optional asyncio multi-agent dev tooling
 tests/        Unit, integration, and GUI validation tests
 docs/         Architecture and source policy documentation
 ```
@@ -26,7 +28,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
 
 - **Python** 3.11+
 - **Lua** 5.4+ with **wxLua** (for GUI)
-- Elevated/administrator privileges (required for real updates; stubbed in v0.1.0)
+- Elevated/administrator privileges (required for real updates)
 
 ## Quick Start
 
@@ -59,6 +61,17 @@ lua main.lua
 
 Set `VERIPATCH_PYTHON` to override the Python executable used by the GUI.
 
+### AgentMesh (optional)
+
+```bash
+cd agentmesh
+pip install -e ".[dev]"
+agentmesh bootstrap
+agentmesh start development --here
+```
+
+See [agentmesh/docs/AGENTMESH.md](agentmesh/docs/AGENTMESH.md).
+
 ## Development Workflow
 
 | Branch    | Purpose                          |
@@ -80,17 +93,18 @@ VeriPatch **never** downloads or installs software from unofficial sources. All 
 
 ## Status
 
-**v0.2.0** adds real update execution infrastructure:
+**v1.0.0** — stable release:
 
-- `CommandRunner` with source validation, dry-run, timeouts, and audit logging
-- Real `list_updates` / `apply` via official CLIs (winget, softwareupdate, apt/dnf/pacman/zypper)
-- Elevation detection + UAC/sudo guidance; apply requires confirmation token
+- Real `list_updates` / `apply` via official CLIs with source validation
+- Elevation detection + confirmation token for non-dry-run apply
 - Structured logging (`VERIPATCH_LOG`), `diagnostics` JSON-RPC method
-- Headless GUI view-model tests via busted
+- AgentMesh 0.1.0 for multi-terminal agent development workflows
 
 Set `VERIPATCH_DRY_RUN=1` to force dry-run mode for the backend IPC server.
 
 Real apply requires `confirm=true`, `confirm_token=veripatch-confirm-apply`, and elevated privileges.
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 

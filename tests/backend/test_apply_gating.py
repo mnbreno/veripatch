@@ -85,3 +85,64 @@ def test_request_elevation_logs_guidance_on_linux(tmp_path: Path) -> None:
             assert request_elevation(audit_logger=audit) is False
     entries = audit.read_entries()
     assert any(e["message"] == "elevation_guidance" for e in entries)
+
+
+def test_ping_handler() -> None:
+    server = JsonRpcServer()
+    result = server._handle_ping(None)
+    assert result == {"status": "ok"}
+
+
+def test_handle_request_unknown_method() -> None:
+    from veripatch.ipc.protocol import JsonRpcRequest
+
+    server = JsonRpcServer()
+    req = JsonRpcRequest(jsonrpc="2.0", method="nope", params=None, id=1)
+    resp = server.handle_request(req)
+    assert "error" in resp
+    assert resp["error"]["code"] == -32601
+
+
+def test_handle_request_method_error() -> None:
+    from veripatch.ipc.protocol import JsonRpcRequest
+
+    server = JsonRpcServer()
+    server._handlers["crash"] = lambda _p: (_ for _ in ()).throw(  # type: ignore[return-value]
+        RuntimeError("boom")
+    )
+    req = JsonRpcRequest(jsonrpc="2.0", method="crash", params=None, id=1)
+    resp = server.handle_request(req)
+    assert "error" in resp
+    assert resp["error"]["code"] == -32603
+
+
+def test_diagnostics_with_audit_limit() -> None:
+    server = JsonRpcServer()
+    result = server._handle_diagnostics({"audit_limit": 5})
+    assert isinstance(result["recent_audit_entries"], list)
+    assert len(result["recent_audit_entries"]) <= 5
+
+
+def test_diagnostics_with_empty_params() -> None:
+    server = JsonRpcServer()
+    result = server._handle_diagnostics(None)
+    assert "version" in result
+    assert "capabilities" in result
+
+
+@patch("veripatch.ipc.server.is_elevated", return_value=True)
+@patch("veripatch.ipc.server.get_updater")
+def test_apply_with_null_params(
+    mock_get_updater: object,
+    _mock_elevated: object,
+) -> None:
+    from veripatch.updaters.base import UpdateResult
+
+    class FakeUpdater:
+        def apply(self, dry_run: bool = True) -> UpdateResult:
+            return UpdateResult(success=True, dry_run=True, message="dry")
+
+    mock_get_updater.return_value = FakeUpdater()
+    server = JsonRpcServer()
+    result = server._handle_apply_updates(None)
+    assert result["dry_run"] is True

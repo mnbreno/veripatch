@@ -1,0 +1,4 @@
+Repository | Name | Current | Available | Arch
+-----------|------|---------|-----------|-----
+1 | updates | curl | 8.4.0 | 8.5.0 | x86_64
+2 | updates | vim | 9.0 | 9.1 | x86_64

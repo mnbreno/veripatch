@@ -92,3 +92,76 @@ def test_get_sources_for_windows() -> None:
     ids = {s.id for s in sources}
     assert "windows_update_agent" in ids
     assert "winget" in ids
+
+
+def test_winget_invalid_arg_rejected(validator: SourceValidator) -> None:
+    outcome = validator.validate_command(
+        ["winget", "install", "evil"],
+        OSType.WINDOWS,
+    )
+    assert not outcome.approved
+    assert outcome.reason != ""
+    assert outcome.command == ("winget", "install", "evil")
+
+
+def test_pacman_su_approved(validator: SourceValidator) -> None:
+    outcome = validator.validate_command(
+        ["pacman", "-Su"],
+        OSType.LINUX,
+        PackageManager.PACMAN,
+    )
+    assert outcome.approved
+    assert outcome.source is not None
+    assert outcome.source.id == "pacman"
+
+
+def test_pacman_syu_combined_approved(validator: SourceValidator) -> None:
+    outcome = validator.validate_command(
+        ["pacman", "-Syu"],
+        OSType.LINUX,
+        PackageManager.PACMAN,
+    )
+    assert outcome.approved
+    assert outcome.source.id == "pacman"
+
+
+def test_pacman_install_rejected(validator: SourceValidator) -> None:
+    outcome = validator.validate_command(
+        ["pacman", "-S", "firefox"],
+        OSType.LINUX,
+        PackageManager.PACMAN,
+    )
+    assert not outcome.approved
+
+
+def test_pacman_qu_approved(validator: SourceValidator) -> None:
+    outcome = validator.validate_command(
+        ["pacman", "-Qu"],
+        OSType.LINUX,
+        PackageManager.PACMAN,
+    )
+    assert outcome.approved
+
+
+def test_source_os_type_mismatch_rejected(validator: SourceValidator) -> None:
+    outcome = validator.validate_command(
+        ["winget", "list"],
+        OSType.LINUX,
+    )
+    assert not outcome.approved
+    assert "registered for" in outcome.reason
+
+
+def test_winget_no_args_approved(validator: SourceValidator) -> None:
+    outcome = validator.validate_command(
+        ["winget"],
+        OSType.WINDOWS,
+    )
+    assert outcome.approved
+
+
+def test_approval_logged(validator: SourceValidator, tmp_path: Path) -> None:
+    validator.validate_command(["winget", "list"], OSType.WINDOWS)
+    log_path = tmp_path / "audit.log"
+    entries = AuditLogger(log_path=log_path).read_entries()
+    assert any(e["event_type"] == "source_approved" for e in entries)
