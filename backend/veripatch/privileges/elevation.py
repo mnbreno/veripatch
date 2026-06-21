@@ -29,6 +29,32 @@ def is_elevated() -> bool:
     return False
 
 
+def get_elevation_guidance(argv: list[str] | None = None) -> dict[str, object]:
+    """Return structured elevation status and platform-specific relaunch hints."""
+    args = argv or sys.argv
+    cmd_line = " ".join(args)
+    elevated = is_elevated()
+    guidance: dict[str, object] = {
+        "elevated": elevated,
+        "platform": sys.platform,
+        "message": "Privileges OK" if elevated else "Elevation required for real apply",
+    }
+    if elevated:
+        return guidance
+
+    if sys.platform == "win32":
+        guidance["method"] = "uac_runas"
+        guidance["suggested"] = f'Run as administrator: {sys.executable} {" ".join(args[1:])}'
+    elif sys.platform == "darwin":
+        guidance["method"] = "sudo"
+        guidance["suggested_sudo"] = f"sudo {cmd_line}"
+    elif sys.platform.startswith("linux"):
+        guidance["method"] = "sudo_or_pkexec"
+        guidance["suggested_sudo"] = f"sudo {cmd_line}"
+        guidance["suggested_pkexec"] = f"pkexec {sys.executable} {' '.join(args[1:])}"
+    return guidance
+
+
 def request_elevation(
     argv: list[str] | None = None,
     audit_logger: AuditLogger | None = None,

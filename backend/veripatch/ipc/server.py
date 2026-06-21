@@ -19,7 +19,7 @@ from veripatch.ipc.protocol import (
 from veripatch.observability.diagnostics import get_diagnostics
 from veripatch.observability.logging_config import get_logger
 from veripatch.privileges.audit import AuditLogger
-from veripatch.privileges.elevation import is_elevated, request_elevation
+from veripatch.privileges.elevation import get_elevation_guidance, is_elevated, request_elevation
 from veripatch.sources.registry import get_sources_for_os
 from veripatch.updaters import get_updater
 
@@ -54,6 +54,7 @@ class JsonRpcServer:
             "diagnostics": self._handle_diagnostics,
             "ping": self._handle_ping,
             "shutdown": self._handle_shutdown,
+            "request_elevation": self._handle_request_elevation,
         }
 
     def _handle_ping(self, _params: dict[str, Any] | list[Any] | None) -> dict[str, str]:
@@ -68,7 +69,31 @@ class JsonRpcServer:
         return {
             "os": info.to_dict(),
             "elevated": is_elevated(),
+            "elevation": get_elevation_guidance(),
         }
+
+    def _handle_request_elevation(
+        self, params: dict[str, Any] | list[Any] | None
+    ) -> dict[str, Any]:
+        spawn = isinstance(params, dict) and bool(params.get("spawn", False))
+        guidance = get_elevation_guidance()
+        if guidance["elevated"]:
+            self.audit.log_action("elevation_already_granted", {})
+            return {**guidance, "spawned": False, "success": True}
+
+        if spawn:
+            request_elevation(audit_logger=self.audit)
+            if sys.platform == "win32":
+                return {
+                    **guidance,
+                    "spawned": True,
+                    "success": True,
+                    "message": "UAC elevation prompt launched",
+                }
+            return {**guidance, "spawned": False, "success": True}
+
+        self.audit.log_action("elevation_guidance_returned", {"spawn": False})
+        return {**guidance, "spawned": False, "success": True}
 
     def _handle_list_sources(self, _params: dict[str, Any] | list[Any] | None) -> dict[str, Any]:
         info = detect_os()

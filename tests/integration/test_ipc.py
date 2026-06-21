@@ -40,7 +40,16 @@ def test_ipc_detect_os() -> None:
     response = _run_rpc("detect_os")
     assert "os" in response["result"]
     assert "elevated" in response["result"]
+    assert "elevation" in response["result"]
     assert "os_type" in response["result"]["os"]
+
+
+def test_ipc_request_elevation_guidance() -> None:
+    response = _run_rpc("request_elevation", {"spawn": False})
+    result = response["result"]
+    assert "elevated" in result
+    assert "platform" in result
+    assert result["success"] is True
 
 
 def test_ipc_list_sources() -> None:

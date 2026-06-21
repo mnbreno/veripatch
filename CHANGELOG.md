@@ -10,6 +10,8 @@ All notable changes to this project are documented here.
 - Python `JsonRpcClient` for multi-call backend sessions
 - **`apply_updates_stream`** RPC with `apply_progress` notifications during apply
 - `CommandRunner.run_streaming()` and `Updater.apply_streaming()` for live output
+- **`request_elevation`** RPC with platform-specific guidance and optional UAC spawn (Windows)
+- `detect_os` includes structured `elevation` guidance when not privileged
 - Cross-platform stderr redirect in wxLua IPC client (Linux/macOS/Windows)
 - `diagnostics` includes session `requests_served` during persistent sessions
 

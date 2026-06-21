@@ -107,4 +107,15 @@ describe("ViewModel.apply confirmation flow", function()
     msg = ViewModel.format_apply_status(nil, "backend down", true)
     assert.is_true(msg:find("Apply failed") ~= nil)
   end)
+
+  it("formats elevation status messages", function()
+    local msg = ViewModel.format_elevation_status({ elevated = true })
+    assert.is_true(msg:find("administrator") ~= nil)
+
+    msg = ViewModel.format_elevation_status({
+      elevated = false,
+      suggested_sudo = "sudo veripatch",
+    })
+    assert.is_true(msg:find("sudo veripatch") ~= nil)
+  end)
 end)

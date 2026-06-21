@@ -70,6 +70,7 @@ Line-delimited JSON-RPC 2.0:
 | `apply_updates` | Applies updates (dry-run by default) |
 | `apply_updates_stream` | Applies updates with `apply_progress` notifications |
 | `diagnostics` | Returns audit tail, capabilities, and session stats |
+| `request_elevation` | Returns elevation guidance; `spawn: true` launches UAC on Windows |
 | `shutdown` | Gracefully ends a persistent IPC session |
 
 Request example:
@@ -106,6 +107,5 @@ Response example:
 ## Future Work
 
 - GUI integration with persistent backend process
-- Windows Update Agent COM integration
-- Interactive elevation request flows per OS (UAC, sudo, pkexec)
+- Windows Update Agent COM apply integration
 - Code signing and update verification

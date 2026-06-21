@@ -100,8 +100,23 @@ function ViewModel.format_apply_status(result, err, dry_run)
   return "Apply failed: " .. error_text
 end
 
-function ViewModel.format_backend_error(context, err)
-  return string.format("%s: %s", context, tostring(err or "unknown backend error"))
+function ViewModel.format_elevation_status(result, err)
+  if not result then
+    return "Elevation check failed: " .. tostring(err or "unknown")
+  end
+  if result.elevated then
+    return "Running with administrator/root privileges"
+  end
+  if result.spawned then
+    return "UAC elevation prompt launched — approve to continue"
+  end
+  if result.suggested_sudo then
+    return "Re-run with: " .. result.suggested_sudo
+  end
+  if result.suggested then
+    return result.suggested
+  end
+  return result.message or "Elevation required for real apply"
 end
 
 return ViewModel

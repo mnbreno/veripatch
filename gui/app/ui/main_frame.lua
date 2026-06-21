@@ -60,8 +60,10 @@ function MainFrame:build()
 
   local btn_sizer = wx.wxBoxSizer(wx.wxHORIZONTAL)
   local refresh_btn = wx.wxButton(panel, wx.wxID_ANY, "Refresh")
+  local elevate_btn = wx.wxButton(panel, wx.wxID_ANY, "Request Elevation")
   self.apply_btn = wx.wxButton(panel, wx.wxID_ANY, ViewModel.apply_button_label(true))
   btn_sizer:Add(refresh_btn, 0, wx.wxRIGHT, 5)
+  btn_sizer:Add(elevate_btn, 0, wx.wxRIGHT, 5)
   btn_sizer:Add(self.apply_btn, 0)
 
   self.status_label = wx.wxStaticText(panel, wx.wxID_ANY, ViewModel.STATUS.READY)
@@ -84,6 +86,10 @@ function MainFrame:build()
 
   refresh_btn:Connect(wx.wxEVT_COMMAND_BUTTON_CLICKED, function()
     self:refresh()
+  end)
+
+  elevate_btn:Connect(wx.wxEVT_COMMAND_BUTTON_CLICKED, function()
+    self:request_elevation()
   end)
 
   self.apply_btn:Connect(wx.wxEVT_COMMAND_BUTTON_CLICKED, function()
@@ -143,6 +149,17 @@ function MainFrame:append_log(msg)
     self.log_output:AppendText(msg .. "\n")
     -- Scroll to bottom automatically
     self.log_output:ShowPosition(self.log_output:GetLastPosition())
+  end
+end
+
+function MainFrame:request_elevation()
+  self:set_status("Checking elevation...")
+  local result, err = self.ipc_client:call("request_elevation", { spawn = true })
+  local status = ViewModel.format_elevation_status(result, err)
+  self:set_status(status)
+  self:append_log(status)
+  if result and result.elevated then
+    self.elevated = true
   end
 end
 
