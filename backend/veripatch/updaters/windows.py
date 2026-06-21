@@ -22,6 +22,7 @@ class WindowsUpdater(Updater):
         """Optional WUA COM path when pywin32 is available."""
         try:
             import win32com.client  # type: ignore[import-untyped]
+            from win32com import com_error  # type: ignore[import-untyped]
         except ImportError:
             return []
 
@@ -44,7 +45,7 @@ class WindowsUpdater(Updater):
                         metadata={"update_id": update_id},
                     )
                 )
-        except Exception:  # noqa: BLE001 - COM may be unavailable in CI
+        except (com_error, AttributeError, OSError):
             return []
         return items
 

@@ -35,3 +35,6 @@ desktop.ini
 
 # Build artifacts
 artifacts/
+
+# Embedded submodules
+tools/wxlua542

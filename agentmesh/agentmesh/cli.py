@@ -110,7 +110,15 @@ async def cmd_run(args: argparse.Namespace) -> int:
 
 async def cmd_orchestrate(args: argparse.Namespace) -> int:
     ensure_runtime_dirs()
-    result = await run_workflow(args.workflow)
+    if args.file_bus:
+        brain = os.environ.get("AGENTMESH_BRAIN", "scripted")
+        print(f"FileBus mode: dispatching to running agents (controller brain={brain})")
+        print("Ensure agents were started with AGENTMESH_BRAIN=llm for local LLM inference.")
+    result = await run_workflow(
+        args.workflow,
+        file_bus=args.file_bus,
+        timeout=args.timeout,
+    )
     print(f"Workflow: {result.name}")
     print(f"Correlation: {result.correlation_id}")
     print(f"Steps: {result.steps}")
@@ -118,6 +126,11 @@ async def cmd_orchestrate(args: argparse.Namespace) -> int:
     if result.final_payload:
         print(f"Final status: {result.final_payload.get('status')}")
         print(f"Final summary: {result.final_payload.get('summary')}")
+    elif args.file_bus:
+        print(
+            "Workflow did not complete. Check `agentmesh status` and LM Studio logs.",
+            file=sys.stderr,
+        )
     return 0 if result.final_payload else 1
 
 
@@ -184,6 +197,17 @@ def main() -> None:
 
     orch_p = sub.add_parser("orchestrate", help="Run a predefined workflow")
     orch_p.add_argument("workflow", choices=list(WORKFLOWS.keys()))
+    orch_p.add_argument(
+        "--file-bus",
+        action="store_true",
+        help="Dispatch to running FileBus agents (required for multi-terminal LLM mode)",
+    )
+    orch_p.add_argument(
+        "--timeout",
+        type=float,
+        default=600.0,
+        help="FileBus workflow wait timeout in seconds (default 600)",
+    )
     orch_p.set_defaults(func=lambda a: asyncio.run(cmd_orchestrate(a)))
 
     args = parser.parse_args()

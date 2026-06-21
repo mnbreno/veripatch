@@ -87,6 +87,7 @@ agentmesh run backend-architect --file-bus --once
 
 # Orchestrate workflow
 agentmesh orchestrate design-review-doc
+agentmesh orchestrate design-review-doc --file-bus   # dispatch to running FileBus agents
 agentmesh orchestrate parallel-ci-check
 ```
 
@@ -96,6 +97,12 @@ Environment variables:
 |----------|---------|-------------|
 | `AGENTMESH_BRAIN` | `scripted` | Brain backend (`scripted` or `llm`) |
 | `AGENTMESH_BRAIN_LATENCY_MS` | `0` | Simulated latency for throughput tests |
+| `AGENTMESH_LLM_PROVIDER` | `openai` | LLM provider (`openai` / `lmstudio` for OpenAI-compatible APIs; `none` falls back to scripted) |
+| `AGENTMESH_LLM_BASE_URL` | `http://127.0.0.1:1234/v1` | OpenAI-compatible API base URL (LM Studio default) |
+| `AGENTMESH_LLM_MODEL` | `local-model` | Model id (e.g. `qwen/qwen3.5-9b`) |
+| `AGENTMESH_LLM_API_KEY` | `lm-studio` | API key (LM Studio accepts any value) |
+| `AGENTMESH_LLM_TIMEOUT` | `300` | Request timeout in seconds (local models can be slow) |
+| `AGENTMESH_LLM_TEMPERATURE` | `0.2` | Sampling temperature |
 | `AGENTMESH_BUS_ROOT` | `<repo>/.agentmesh/bus` | FileBus root directory |
 | `AGENTMESH_RUNTIME_ROOT` | `<repo>/.agentmesh/run` | Agent lock files (PID + terminal session) |
 | `AGENTMESH_IN_TERMINAL` | — | Force in-terminal launch (`1`) |
@@ -128,9 +135,40 @@ Environment variables:
 | 5th | reality-checker |
 
 5. **Verify** from any terminal: `agentmesh status`
-6. **Optional**: use a 6th terminal as controller: `agentmesh orchestrate design-review-doc`
+6. **Optional**: use a 6th terminal as controller:
+   ```powershell
+   agentmesh orchestrate design-review-doc --file-bus
+   ```
+   Use `--file-bus` when agents are running in separate terminals. Without it, `orchestrate` runs an in-process workflow and **does not** call your running agents or local LLM.
 
 In Cursor/VS Code integrated terminals (`TERM_PROGRAM=vscode`), `start development` runs the agent **in that same terminal** by default. Use `--spawn` or `AGENTMESH_SPAWN_EXTERNAL=1` to open external windows instead.
+
+## Local LLM (LM Studio)
+
+Use an OpenAI-compatible local server (LM Studio, Ollama, etc.) as the agent brain:
+
+```powershell
+cd agentmesh
+$env:AGENTMESH_BRAIN = "llm"
+$env:AGENTMESH_LLM_PROVIDER = "openai"
+$env:AGENTMESH_LLM_BASE_URL = "http://10.5.0.2:1234/v1"
+$env:AGENTMESH_LLM_MODEL = "qwen/qwen3.5-9b"
+$env:AGENTMESH_LLM_API_KEY = "lm-studio"
+
+agentmesh start development --here
+```
+
+Start all five dev agents against LM Studio (Windows):
+
+```powershell
+.\scripts\start-llm-development.ps1
+```
+
+Optional overrides:
+
+```powershell
+.\scripts\start-llm-development.ps1 -BaseUrl "http://10.5.0.2:1234/v1" -Model "qwen/qwen3.5-9b"
+```
 
 ## Workflows
 

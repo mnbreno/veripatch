@@ -63,6 +63,27 @@ function ViewModel.apply_button_label(dry_run)
   return "Apply Updates"
 end
 
+function ViewModel.update_all_button_label()
+  return "Update All"
+end
+
+function ViewModel.confirm_update_all_message()
+  return table.concat({
+    "Install all available updates from official sources?",
+    "",
+    "This uses WinGet, Windows Update, apt, or other vendor tools.",
+    "Apps may restart and some updates may require a reboot.",
+  }, "\n")
+end
+
+function ViewModel.confirm_elevation_message()
+  return table.concat({
+    "Administrator privileges are required to install updates.",
+    "",
+    "Request elevation now?",
+  }, "\n")
+end
+
 function ViewModel.can_apply_real(elevated, confirmed, confirm_token)
   if not elevated then
     return false, "Administrator/root privileges required for real apply"

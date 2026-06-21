@@ -2,15 +2,62 @@
 -- VeriPatch GUI entry point (wxLua)
 -- Requires wxLua with wxWidgets bindings installed
 
-local function find_backend_dir()
+local function script_dir()
   local src = debug.getinfo(1, "S").source:match("@?(.*)")
-  local gui_dir = src:match("(.*[/\\])") or "./"
-  return gui_dir .. "../backend"
+  return src:match("(.*[/\\])") or "./"
 end
 
--- Add gui/ to package.path for app.* modules
-local script_path = debug.getinfo(1, "S").source:match("@?(.*)")
-local gui_root = script_path:match("(.*[/\\])") or "./"
+local function normalize_path(path)
+  if package.config:sub(1, 1) ~= "\\" or not path or path == "" then
+    return path
+  end
+  local handle = io.popen('cd /d "' .. path:gsub('"', '""') .. '" && cd', "r")
+  if not handle then
+    return path
+  end
+  local absolute = handle:read("*l")
+  handle:close()
+  return absolute or path
+end
+
+local function resolve_python_cmd()
+  local configured = os.getenv("VERIPATCH_PYTHON")
+  if configured and configured ~= "" then
+    return configured
+  end
+
+  if package.config:sub(1, 1) == "\\" then
+    local local_app = os.getenv("LOCALAPPDATA")
+    if local_app and local_app ~= "" then
+      local candidates = {
+        local_app .. "\\Programs\\Python\\Python314\\python.exe",
+        local_app .. "\\Programs\\Python\\Python313\\python.exe",
+        local_app .. "\\Programs\\Python\\Python312\\python.exe",
+        local_app .. "\\Programs\\Python\\Python311\\python.exe",
+      }
+      for _, candidate in ipairs(candidates) do
+        local handle = io.open(candidate, "rb")
+        if handle then
+          handle:close()
+          return candidate
+        end
+      end
+    end
+
+    local handle = io.popen("where python 2>nul", "r")
+    if handle then
+      local line = handle:read("*l")
+      handle:close()
+      if line and line ~= "" then
+        return line
+      end
+    end
+  end
+
+  return "python"
+end
+
+local gui_root = script_dir()
 package.path = gui_root .. "?.lua;" .. gui_root .. "?/init.lua;" .. package.path
 
 local wx_ok, wx = pcall(require, "wx")
@@ -25,14 +72,14 @@ end
 
 local MainFrame = require("app.ui.main_frame")
 
-local app = wx.wxApp()
-app:Init()
+local app = wx.wxApp:new()
 
-local backend_cwd = find_backend_dir()
+local backend_cwd = normalize_path(gui_root .. "../backend")
 local frame = MainFrame.new(nil, {
-  python_cmd = os.getenv("VERIPATCH_PYTHON") or "python",
+  python_cmd = resolve_python_cmd(),
   args = {"-m", "veripatch"},
   cwd = backend_cwd,
+  gui_root = normalize_path(gui_root),
 })
 
 frame:build()
@@ -40,5 +87,4 @@ frame:show()
 
 app:MainLoop()
 
--- Ensure the backend process is closed when the GUI application exits.
 frame.ipc_client:close()

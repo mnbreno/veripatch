@@ -6,7 +6,7 @@ import json
 import os
 import sys
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TextIO
 
 from veripatch.config import APPLY_CONFIRMATION_TOKEN
 from veripatch.detection.os_detect import detect_os
@@ -182,8 +182,10 @@ class JsonRpcServer:
     def _handle_apply_updates_stream(
         self,
         request: JsonRpcRequest,
+        writer: TextIO | None = None,
     ) -> dict[str, Any]:
         """Stream apply progress as JSON-RPC notifications, then return final result."""
+        out = writer or sys.stdout
         dry_run, gate_error = self._apply_gate(request.params)
         if gate_error:
             return make_result(request.id, gate_error).to_dict()
@@ -200,21 +202,26 @@ class JsonRpcServer:
                     "method": "apply_progress",
                     "params": {"line": line},
                 }
-                sys.stdout.write(json.dumps(notification, separators=(",", ":")) + "\n")
-                sys.stdout.flush()
+                out.write(json.dumps(notification, separators=(",", ":")) + "\n")
+                out.flush()
         except StopIteration as exc:
             result = exc.value
             final = result.to_dict() if hasattr(result, "to_dict") else dict(result)
 
         return make_result(request.id, final).to_dict()
 
-    def handle_request(self, request: JsonRpcRequest) -> dict[str, Any]:
+    def handle_request(
+        self,
+        request: JsonRpcRequest,
+        *,
+        writer: TextIO | None = None,
+    ) -> dict[str, Any]:
         if self.debug:
             self.log.debug("RPC request: %s", request.method)
 
         if request.method == "apply_updates_stream":
             try:
-                return self._handle_apply_updates_stream(request)
+                return self._handle_apply_updates_stream(request, writer=writer)
             except Exception as exc:  # noqa: BLE001
                 self.log.exception("RPC error in %s", request.method)
                 return make_error(request.id, INTERNAL_ERROR, str(exc)).to_dict()

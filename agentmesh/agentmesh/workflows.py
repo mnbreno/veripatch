@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
 from agentmesh.agent.brain import get_brain
 from agentmesh.agent.spec import load_all_agents
 from agentmesh.agent.worker import AgentWorker
+from agentmesh.bus.file_bus import FileBus
 from agentmesh.bus.memory_bus import InMemoryBus
-from agentmesh.protocol import create_request, new_correlation_id
+from agentmesh.console import console_print
+from agentmesh.paths import ensure_runtime_dirs
+from agentmesh.protocol import MessageType, create_request, new_correlation_id
 from agentmesh.scheduler import Scheduler, default_agents_dir, register_agents
 
 
@@ -145,10 +149,79 @@ async def run_parallel_workflow(name: str, bus: InMemoryBus | None = None) -> Wo
     )
 
 
-async def run_workflow(name: str) -> WorkflowResult:
+async def run_sequential_workflow_file_bus(
+    name: str,
+    *,
+    bus: FileBus | None = None,
+    timeout: float = 600.0,
+    poll_interval: float = 2.0,
+) -> WorkflowResult:
+    """Dispatch a sequential workflow to running FileBus agent processes."""
+    wf = WORKFLOWS[name]
+    agent_ids: list[str] = wf["agents"]
+    bus_path, _ = ensure_runtime_dirs()
+    bus = bus or FileBus(bus_path)
+    for agent_id in agent_ids + ["orchestrator"]:
+        await bus.register_agent(agent_id)
+
+    cid = new_correlation_id()
+    kickoff = create_request(
+        "orchestrator",
+        agent_ids[0],
+        {"task": wf["task"], "auto_forward": True},
+        correlation_id=cid,
+    )
+    await bus.send(kickoff)
+    console_print(f"Dispatched to FileBus -> {agent_ids[0]} (correlation {cid[:8]}...)")
+
+    deadline = asyncio.get_event_loop().time() + timeout
+    steps: list[str] = []
+    final_payload: dict[str, Any] | None = None
+    last_agent = agent_ids[-1]
+
+    while asyncio.get_event_loop().time() < deadline:
+        history = await bus.history(limit=100)
+        for msg in history:
+            if msg.correlation_id != cid:
+                continue
+            if msg.sender in agent_ids:
+                step = f"{msg.sender}:{msg.type.value}"
+                if step not in steps:
+                    steps.append(step)
+                    console_print(f"  step: {step}")
+            if msg.type == MessageType.RESPONSE and msg.sender == last_agent:
+                final_payload = msg.payload
+                break
+        if final_payload is not None:
+            break
+        await asyncio.sleep(poll_interval)
+
+    history = await bus.history(limit=100)
+    return WorkflowResult(
+        name=name,
+        correlation_id=cid,
+        final_payload=final_payload,
+        history_count=len(history),
+        steps=steps,
+    )
+
+
+async def run_workflow(
+    name: str,
+    *,
+    file_bus: bool = False,
+    timeout: float = 600.0,
+) -> WorkflowResult:
     if name not in WORKFLOWS:
         raise KeyError(f"Unknown workflow: {name}")
     wf = WORKFLOWS[name]
+    if file_bus:
+        if "agents" not in wf:
+            raise ValueError(
+                f"Workflow '{name}' does not support FileBus orchestration yet. "
+                "Use a sequential workflow such as design-review-doc."
+            )
+        return await run_sequential_workflow_file_bus(name, timeout=timeout)
     if "agents" in wf:
         return await run_sequential_workflow(name)
     return await run_parallel_workflow(name)
