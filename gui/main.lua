@@ -7,17 +7,13 @@ local function script_dir()
   return src:match("(.*[/\\])") or "./"
 end
 
-local function normalize_path(path)
-  if package.config:sub(1, 1) ~= "\\" or not path or path == "" then
-    return path
-  end
-  local handle = io.popen('cd /d "' .. path:gsub('"', '""') .. '" && cd', "r")
-  if not handle then
-    return path
-  end
-  local absolute = handle:read("*l")
-  handle:close()
-  return absolute or path
+local gui_root = script_dir()
+package.path = gui_root .. "?.lua;" .. gui_root .. "?/init.lua;" .. package.path
+
+local win_silent = require("app.win_silent")
+
+local function normalize_path(path, wx)
+  return win_silent.normalize_path(path, wx)
 end
 
 local function resolve_python_cmd()
@@ -43,22 +39,10 @@ local function resolve_python_cmd()
         end
       end
     end
-
-    local handle = io.popen("where python 2>nul", "r")
-    if handle then
-      local line = handle:read("*l")
-      handle:close()
-      if line and line ~= "" then
-        return line
-      end
-    end
   end
 
   return "python"
 end
-
-local gui_root = script_dir()
-package.path = gui_root .. "?.lua;" .. gui_root .. "?/init.lua;" .. package.path
 
 local wx_ok, wx = pcall(require, "wx")
 if not wx_ok then
@@ -68,6 +52,10 @@ if not wx_ok then
     "Error: " .. tostring(wx) .. "\n"
   )
   os.exit(1)
+end
+
+if wx.wxSystemOptions and wx.wxSystemOptions.SetOption then
+  wx.wxSystemOptions.SetOption("msw.force-shell-dpi-aware", "1")
 end
 
 local MainFrame = require("app.ui.main_frame")

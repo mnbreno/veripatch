@@ -51,12 +51,33 @@ describe("ViewModel.format_update_rows", function()
     local rows, status = ViewModel.format_update_rows({
       updates = {
         items = {
-          { title = "Security Update", source_id = "winget" },
+          {
+            title = "Security Update",
+            source_id = "winget",
+            metadata = { package_id = "Vendor.App" },
+          },
         },
       },
     })
     assert.are.equal(ViewModel.STATUS.LOADED, status)
     assert.are.equal("Security Update [winget]", rows[1])
+  end)
+
+  it("parses structured update items", function()
+    local items = ViewModel.parse_update_items({
+      updates = {
+        items = {
+          {
+            id = "winget-cursor",
+            title = "Cursor",
+            source_id = "winget",
+            metadata = { package_id = ViewModel.CURSOR_PACKAGE_ID },
+          },
+        },
+      },
+    })
+    assert.are.equal(1, #items)
+    assert.are.equal(ViewModel.CURSOR_PACKAGE_ID, items[1].package_id)
   end)
 
   it("returns load failed status on error", function()
@@ -106,6 +127,45 @@ describe("ViewModel.apply confirmation flow", function()
 
     msg = ViewModel.format_apply_status(nil, "backend down", true)
     assert.is_true(msg:find("Apply failed") ~= nil)
+
+    msg = ViewModel.format_apply_status({
+      success = false,
+      summary = { updated = 2, skipped = 1, failed = 1 },
+    }, nil, false)
+    assert.is_true(msg:find("2 updated") ~= nil)
+    assert.is_true(msg:find("1 skipped") ~= nil)
+    assert.is_true(msg:find("1 failed") ~= nil)
+  end)
+
+  it("builds apply params for selected packages and skip rules", function()
+    local params = ViewModel.build_apply_params(
+      false,
+      true,
+      config.APPLY_CONFIRMATION_TOKEN,
+      {
+        package_ids = { "chrox.Readest" },
+        skip_package_ids = { ViewModel.CURSOR_PACKAGE_ID },
+      }
+    )
+    assert.are.same({ "chrox.Readest" }, params.package_ids)
+    assert.are.same({ ViewModel.CURSOR_PACKAGE_ID }, params.skip_package_ids)
+  end)
+
+  it("detects cursor gate conditions", function()
+    local items = {
+      { package_id = ViewModel.CURSOR_PACKAGE_ID, display = "Cursor [winget]" },
+    }
+    assert.is_true(ViewModel.should_prompt_cursor_gate(items, { cursor_running = true }))
+    assert.is_false(ViewModel.should_prompt_cursor_gate(items, { cursor_running = false }))
+  end)
+
+  it("collects selected package ids from checked indices", function()
+    local items = {
+      { package_id = "chrox.Readest", display = "Readest [winget]" },
+      { package_id = ViewModel.CURSOR_PACKAGE_ID, display = "Cursor [winget]" },
+    }
+    local package_ids = ViewModel.selected_package_ids(items, { 0 })
+    assert.are.same({ "chrox.Readest" }, package_ids)
   end)
 
   it("formats elevation status messages", function()

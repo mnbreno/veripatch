@@ -15,12 +15,6 @@ All notable changes to this project are documented here.
 - Cross-platform stderr redirect in wxLua IPC client (Linux/macOS/Windows)
 - `diagnostics` includes session `requests_served` during persistent sessions
 
-### AgentMesh
-
-- Message TTL (`ttl_seconds`) with expiry checks and `prune_expired()`
-- FileBus two-phase delivery (`.processing` rename) with crash recovery
-- Bus `shutdown()` and periodic cleanup loop on `MessageBus`
-
 ## [1.0.0] — 2026-06-21
 
 ### VeriPatch — Stable release
@@ -31,18 +25,8 @@ All notable changes to this project are documented here.
 - `diagnostics` JSON-RPC method and structured logging (`VERIPATCH_LOG`)
 - Headless GUI view-model tests (busted)
 - Cross-platform CI: pytest, ruff, mypy, luacheck, busted
-
-### AgentMesh — Initial release (0.1.0)
-
-- Asyncio multi-agent system with structured messaging protocol
-- Five agency-aligned agents with prompt system and scripted brain
-- In-memory and file-based message buses for single- and multi-terminal dev
-- Interactive CLI (`start development`, `status`, `orchestrate`)
-- Workflows: `design-review-doc`, `parallel-ci-check`
-- Windows console encoding fixes and persistent agent listen loop
-- Test isolation from developer runtime locks; 75%+ coverage gate
 - Tightened Pacman flag validation (reject `-S` install; allow combined `-Syu`)
-- Expanded VeriPatch test coverage (104 tests): protocol, pacman/dnf/zypper parsers
+- Expanded test coverage (104 tests): protocol, pacman/dnf/zypper parsers
 
 ## [0.2.0] — Prior release
 

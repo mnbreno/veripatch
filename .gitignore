@@ -22,6 +22,9 @@ audit.log
 .veripatch/
 .agentmesh/
 
+# AgentMesh (separate local project — not part of VeriPatch repo)
+agentmesh/
+
 # IDE
 .vscode/
 .idea/
@@ -35,6 +38,8 @@ desktop.ini
 
 # Build artifacts
 artifacts/
+packaging/windows/staging/
+packaging/windows/cache/
 
 # Embedded submodules
 tools/wxlua542

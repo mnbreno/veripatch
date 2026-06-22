@@ -2,6 +2,19 @@
 -- Talks to the Python backend over TCP (preferred) or stdio one-shot fallback.
 
 local ipc = {}
+local win_silent = require("app.win_silent")
+local wx_module = nil
+
+local function get_wx()
+  if wx_module then
+    return wx_module
+  end
+  local ok, wx = pcall(require, "wx")
+  if ok then
+    wx_module = wx
+  end
+  return wx_module
+end
 
 local function shell_quote(value)
   local text = tostring(value)
@@ -78,20 +91,7 @@ local function encode_params(params)
 end
 
 local function normalize_path(path)
-  if not path or path == "" then
-    return path
-  end
-  if package.config:sub(1, 1) == "\\" then
-    local handle = io.popen('cd /d ' .. shell_quote(path) .. ' && cd', "r")
-    if handle then
-      local absolute = handle:read("*l")
-      handle:close()
-      if absolute and absolute ~= "" then
-        return absolute
-      end
-    end
-  end
-  return path
+  return win_silent.normalize_path(path, get_wx())
 end
 
 local function resolve_ipc_port(cwd)
@@ -117,16 +117,7 @@ local function resolve_ipc_port(cwd)
 end
 
 local function sleep_ms(ms)
-  local wx_ok, wx = pcall(require, "wx")
-  if wx_ok and wx.wxMilliSleep then
-    wx.wxMilliSleep(ms)
-    return
-  end
-  if package.config:sub(1, 1) == "\\" then
-    os.execute(string.format('powershell -NoProfile -Command "Start-Sleep -Milliseconds %d" >nul 2>&1', ms))
-  else
-    os.execute("sleep " .. tostring(ms / 1000))
-  end
+  win_silent.sleep_ms(ms, get_wx())
 end
 
 local function write_ipc_port(cwd, port)
@@ -141,8 +132,8 @@ local function write_ipc_port(cwd, port)
     port_file = cwd .. port_file
   end
   local dir = port_file:match("^(.*)[/\\][^/\\]+$")
-  if dir and package.config:sub(1, 1) == "\\" then
-    os.execute('mkdir "' .. dir:gsub('"', '""') .. '" 2>nul')
+  if dir then
+    win_silent.mkdir_p(dir, get_wx())
   end
   local handle = io.open(port_file, "w")
   if not handle then
@@ -313,28 +304,49 @@ function ipc:_ping_backend()
 end
 
 function ipc:_spawn_backend()
-  local cmd_parts = { shell_quote(self.cmd) }
-  for _, arg in ipairs(self.args) do
-    table.insert(cmd_parts, shell_quote(arg))
+  if os.getenv("VERIPATCH_BACKEND_MANAGED") == "1" then
+    for _ = 1, 20 do
+      sleep_ms(300)
+      if self:_ping_backend() then
+        self.use_rpc = true
+        return true
+      end
+    end
+    return false
   end
-  table.insert(cmd_parts, "--port")
-  table.insert(cmd_parts, tostring(self.port))
-  table.insert(cmd_parts, "--write-port-file")
 
-  local spawn_cmd
+  if package.config:sub(1, 1) == "\\" and self.cwd and self.cwd ~= "" then
+    local project_root = self.cwd:match("^(.*)[/\\][^/\\]+$")
+    if project_root then
+      if win_silent.spawn_backend(project_root, self.port, self.cmd) then
+        write_ipc_port(self.cwd, self.port)
+        for _ = 1, 10 do
+          sleep_ms(300)
+          if self:_ping_backend() then
+            self.use_rpc = true
+            return true
+          end
+        end
+        return false
+      end
+    end
+  end
+
   if package.config:sub(1, 1) == "\\" then
-    spawn_cmd = 'start "" /MIN ' .. table.concat(cmd_parts, " ")
+    win_silent.spawn_pythonw_backend(self.cwd, self.cmd, self.args, self.port)
   else
-    spawn_cmd = table.concat(cmd_parts, " ") .. " >/dev/null 2>&1 &"
-  end
-
-  local ok = os.execute(backend_prefix(self) .. spawn_cmd)
-  if ok == nil then
-    ok = false
+    local cmd_parts = { shell_quote(self.cmd) }
+    for _, arg in ipairs(self.args) do
+      table.insert(cmd_parts, shell_quote(arg))
+    end
+    table.insert(cmd_parts, "--port")
+    table.insert(cmd_parts, tostring(self.port))
+    table.insert(cmd_parts, "--write-port-file")
+    os.execute(backend_prefix(self) .. table.concat(cmd_parts, " ") .. " >/dev/null 2>&1 &")
   end
   write_ipc_port(self.cwd, self.port)
 
-  for attempt = 1, 10 do
+  for _ = 1, 10 do
     sleep_ms(300)
     if self:_ping_backend() then
       self.use_rpc = true

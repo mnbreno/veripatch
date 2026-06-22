@@ -53,15 +53,19 @@ class UpdateResult:
     message: str
     items: list[UpdateItem] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    summary: dict[str, int] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "success": self.success,
             "dry_run": self.dry_run,
             "message": self.message,
             "items": [item.to_dict() for item in self.items],
             "errors": self.errors,
         }
+        if self.summary is not None:
+            payload["summary"] = self.summary
+        return payload
 
 
 class Updater(ABC):
@@ -102,6 +106,9 @@ class Updater(ABC):
     def apply_streaming(
         self,
         dry_run: bool = True,
+        *,
+        skip_package_ids: frozenset[str] | None = None,
+        package_ids: frozenset[str] | None = None,
     ) -> Generator[str, None, UpdateResult]:
         """Apply updates and yield progress/log lines."""
 

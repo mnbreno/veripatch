@@ -9,7 +9,7 @@ from collections.abc import Callable
 from typing import Any, TextIO
 
 from veripatch.config import APPLY_CONFIRMATION_TOKEN
-from veripatch.detection.os_detect import detect_os
+from veripatch.detection.os_detect import OSType, detect_os
 from veripatch.ipc.protocol import (
     JsonRpcRequest,
     make_error,
@@ -116,10 +116,15 @@ class JsonRpcServer:
         updater = get_updater(info, audit_logger=self.audit, dry_run=_env_dry_run())
         check_result = updater.check()
         list_result = updater.list_updates()
-        return {
+        payload: dict[str, Any] = {
             "check": check_result.to_dict(),
             "updates": list_result.to_dict(),
         }
+        if info.os_type == OSType.WINDOWS:
+            from veripatch.updaters.windows import get_apply_blockers
+
+            payload["blockers"] = get_apply_blockers(list_result.items)
+        return payload
 
     def _handle_diagnostics(self, params: dict[str, Any] | list[Any] | None) -> dict[str, Any]:
         limit = 20
@@ -192,7 +197,20 @@ class JsonRpcServer:
 
         info = detect_os()
         updater = get_updater(info, audit_logger=self.audit, dry_run=_env_dry_run())
-        stream = updater.apply_streaming(dry_run=dry_run)
+        skip_ids = None
+        package_ids = None
+        if isinstance(request.params, dict):
+            raw_skip = request.params.get("skip_package_ids")
+            if isinstance(raw_skip, list):
+                skip_ids = frozenset(str(item) for item in raw_skip if item)
+            raw_packages = request.params.get("package_ids")
+            if isinstance(raw_packages, list):
+                package_ids = frozenset(str(item) for item in raw_packages if item)
+        stream = updater.apply_streaming(
+            dry_run=dry_run,
+            skip_package_ids=skip_ids,
+            package_ids=package_ids,
+        )
         final: dict[str, Any]
         try:
             while True:
