@@ -1,0 +1,32 @@
+{
+  "schema_version": "1",
+  "project": "veripatch",
+  "version": "1.2.0",
+  "generated_at": "2026-06-22T15:36:23.160658+00:00",
+  "workflow": "veripatch-release-gate",
+  "correlation_id": "cd3a9428-2a67-4892-9a80-facf7d31f699",
+  "consensus": {
+    "approved": true,
+    "production_ready": true,
+    "blockers": [],
+    "summary": "Reality Checker completed: Validate VeriPatch release 1.2.0 for stable publication: CI green, security revi",
+    "agents": [
+      {
+        "agent_id": "devops-automator",
+        "message_type": "response",
+        "verdict": "ok"
+      },
+      {
+        "agent_id": "code-reviewer",
+        "message_type": "response",
+        "verdict": "ok"
+      },
+      {
+        "agent_id": "reality-checker",
+        "message_type": "response",
+        "verdict": "ok"
+      }
+    ],
+    "missing_agents": []
+  }
+}
