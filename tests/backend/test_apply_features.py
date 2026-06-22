@@ -70,3 +70,4 @@ def test_check_updates_includes_blockers_on_windows() -> None:
     assert "blockers" in payload
     assert payload["blockers"]["cursor_running"] is True
     assert payload["blockers"]["cursor_update_available"] is True
+    assert payload["blockers"]["cursor_package_id"] == CURSOR_PACKAGE_ID

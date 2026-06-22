@@ -452,12 +452,36 @@ class WindowsUpdater(Updater):
                 skipped_count=skipped_count,
             )
 
-        if skip and not dry_run:
+        if skip:
             package_ids_to_apply = self._list_winget_package_ids(skip)
             if package_ids_to_apply:
                 if CURSOR_PACKAGE_ID in skip:
                     yield (
                         "[VeriPatch] Skipping Cursor and updating other packages."
+                    )
+                if dry_run:
+                    yield (
+                        f"[Dry-run] would update: {', '.join(package_ids_to_apply)}"
+                    )
+                    return UpdateResult(
+                        success=True,
+                        dry_run=True,
+                        message=(
+                            f"Dry-run: would update {len(package_ids_to_apply)} package(s)"
+                        ),
+                        summary={
+                            "updated": 0,
+                            "skipped": len(skip),
+                            "failed": 0,
+                        },
+                        items=[
+                            UpdateItem(
+                                id="winget-apply-dry-run",
+                                title="[Dry-run] WinGet selected upgrades",
+                                source_id=self.SOURCE_WINGET,
+                                status=UpdateStatus.PENDING,
+                            )
+                        ],
                     )
                 exec_result = yield from self._apply_selected_packages(
                     package_ids_to_apply,
@@ -469,6 +493,24 @@ class WindowsUpdater(Updater):
                     skipped_count=len(skip),
                 )
             if CURSOR_PACKAGE_ID in skip:
+                if dry_run:
+                    yield (
+                        "[Dry-run] Only Cursor has updates and it would be skipped."
+                    )
+                    return UpdateResult(
+                        success=True,
+                        dry_run=True,
+                        message="Dry-run: Cursor update would be skipped",
+                        summary={"updated": 0, "skipped": 1, "failed": 0},
+                        items=[
+                            UpdateItem(
+                                id="winget-apply-dry-run",
+                                title="[Dry-run] Cursor skipped",
+                                source_id=self.SOURCE_WINGET,
+                                status=UpdateStatus.PENDING,
+                            )
+                        ],
+                    )
                 yield "[VeriPatch] Only Cursor has updates and it was skipped."
                 return UpdateResult(
                     success=False,

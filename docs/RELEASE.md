@@ -6,7 +6,7 @@ Stable releases publish a **Windows installer** on GitHub Releases. Publication 
 
 1. Develop on `staging`.
 2. Bump version in `backend/pyproject.toml` and update `CHANGELOG.md`.
-3. Run AgentMesh release gate (separate [AgentMesh](https://github.com/mnbreno/agentmesh) repo):
+3. Run AgentMesh release gate (private AgentMesh repository, local clone):
 
    ```bash
    agentmesh release verify \

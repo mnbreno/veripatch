@@ -9,7 +9,7 @@
     "approved": true,
     "production_ready": true,
     "blockers": [],
-    "summary": "Reality Checker completed: Validate VeriPatch release 1.1.0 for stable publication: CI green, security revi",
+    "summary": "Reality Checker completed: Validate VeriPatch release 1.1.0 for stable publication: CI green, security review, docs, and Windows installer readiness",
     "agents": [
       {
         "agent_id": "devops-automator",

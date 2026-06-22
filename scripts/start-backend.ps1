@@ -41,7 +41,7 @@ if (-not $PythonExe) {
     if ($PythonCmd) {
         $PythonExe = $PythonCmd.Source
     } else {
-        $Fallback = Join-Path $env:LOCALAPPDATA "Programs\Python\Python314\python.exe"
+        $Fallback = Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe"
         if (Test-Path $Fallback) {
             $PythonExe = $Fallback
         }

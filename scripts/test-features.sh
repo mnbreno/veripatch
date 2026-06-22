@@ -7,10 +7,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 pick_python() {
   local candidate
-  for candidate in python python3 \
-    "/mnt/c/Users/breno/AppData/Local/Programs/Python/Python314/python.exe" \
-    "$ROOT/tools/../AppData/Local/Programs/Python/Python314/python.exe"
-  do
+  for candidate in python python3 ${PYTHON_CUSTOM_PATH:+"$PYTHON_CUSTOM_PATH"}; do
+    if [ -z "${candidate:-}" ]; then
+      continue
+    fi
     if command -v "$candidate" >/dev/null 2>&1; then
       candidate="$(command -v "$candidate")"
     elif [ ! -f "$candidate" ]; then

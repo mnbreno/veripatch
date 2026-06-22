@@ -18,8 +18,13 @@ function text.repair_mojibake(value)
   end
   local packed = table.concat(bytes)
   local chars = {}
-  for code in utf8_lib.codes(packed) do
-    chars[#chars + 1] = utf8_lib.char(code)
+  local ok, err = pcall(function()
+    for code in utf8_lib.codes(packed) do
+      chars[#chars + 1] = utf8_lib.char(code)
+    end
+  end)
+  if not ok then
+    return value
   end
   local repaired = table.concat(chars)
   if repaired ~= "" and not repaired:find("Ã", 1, true) then

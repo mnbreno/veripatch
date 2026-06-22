@@ -2,6 +2,8 @@
 
 **VeriPatch** is a cross-platform desktop utility that applies system and software updates using **only official, verified sources**. It combines a native **wxLua** GUI with a **Python** backend to deliver secure, auditable update workflows on Windows, macOS, and Linux.
 
+AgentMesh is maintained in a separate private repository and is not part of this project.
+
 ## Features
 
 - **Official sources only** — Windows Update Agent, WinGet, Microsoft Store; macOS `softwareupdate` and App Store; Linux APT, DNF, Pacman, Zypper
@@ -100,7 +102,7 @@ Real apply requires `confirm=true`, `confirm_token=veripatch-confirm-apply`, and
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 
-Stable releases publish a Windows installer after [AgentMesh consensus](docs/RELEASE.md). See [docs/RELEASE.md](docs/RELEASE.md) for the release process.
+Stable releases publish a Windows installer after agent consensus validation. See [docs/RELEASE.md](docs/RELEASE.md) for the release process.
 
 ## License
 

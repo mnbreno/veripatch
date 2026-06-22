@@ -92,7 +92,7 @@ Copy-Item -Force (Join-Path $BackendDir "pyproject.toml") (Join-Path $AppDir "ba
 
 $ScriptsDest = Join-Path $AppDir "scripts"
 New-Item -ItemType Directory -Path $ScriptsDest | Out-Null
-foreach ($name in @("start-gui.ps1", "start-backend.ps1", "start-gui-hidden.vbs", "create-shortcut.ps1")) {
+foreach ($name in @("start-gui.ps1", "start-backend.ps1", "start-backend-hidden.vbs", "start-gui-hidden.vbs", "create-shortcut.ps1")) {
     Copy-Item -Force (Join-Path $ScriptDir $name) (Join-Path $ScriptsDest $name)
 }
 

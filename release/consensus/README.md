@@ -1,8 +1,8 @@
 # Release consensus artifacts
 
-AgentMesh exports one JSON file per stable release. Commit the file here before tagging `main`.
+AgentMesh (private repository) exports one JSON file per stable release. Commit the file here before tagging `main`.
 
-## Generate (AgentMesh repo)
+## Generate (private AgentMesh clone)
 
 ```bash
 agentmesh release verify \

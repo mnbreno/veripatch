@@ -47,11 +47,11 @@ function M.mkdir_p(dir_path, wx)
     end
   end
   if M.is_windows() then
-    M.run_hidden('mkdir "' .. dir_path:gsub('"', '""') .. '" 2>nul')
-    return true
+    local ok = os.execute('if not exist "' .. dir_path:gsub('"', '""') .. '" mkdir "' .. dir_path:gsub('"', '""') .. '"')
+    return ok == 0 or ok == true
   end
-  os.execute('mkdir -p "' .. dir_path:gsub('"', '\\"') .. '"')
-  return true
+  local ok = os.execute('mkdir -p "' .. dir_path:gsub('"', '\\"') .. '"')
+  return ok == 0 or ok == true
 end
 
 function M.run_hidden(command_line)
@@ -72,6 +72,7 @@ function M.run_hidden(command_line)
   handle:close()
 
   os.execute('wscript.exe //B //Nologo "' .. vbs_path:gsub('"', '""') .. '"')
+  os.execute("ping 127.0.0.1 -n 1 -w 150 >nul")
   os.remove(vbs_path)
   return true
 end
@@ -82,8 +83,8 @@ function M.sleep_ms(ms, wx)
     return
   end
   if M.is_windows() then
-    M.run_hidden(string.format(
-      "powershell.exe -NoProfile -WindowStyle Hidden -Command \"Start-Sleep -Milliseconds %d\"",
+    os.execute(string.format(
+      'powershell.exe -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Milliseconds %d"',
       ms
     ))
     return
@@ -116,12 +117,6 @@ function M.spawn_pythonw_backend(cwd, python_cmd, args, port)
   local pythonw = tostring(python_cmd or "python.exe"):gsub("python%.exe$", "pythonw.exe")
   if pythonw == tostring(python_cmd or "") then
     pythonw = pythonw:gsub("python$", "pythonw.exe")
-  end
-  local py_handle = io.open(pythonw, "rb")
-  if not py_handle then
-    pythonw = tostring(python_cmd or "python")
-  else
-    py_handle:close()
   end
 
   local arg_list = {}
