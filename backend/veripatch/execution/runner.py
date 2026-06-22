@@ -285,8 +285,8 @@ class CommandRunner:
             )
 
         self.audit.log_action("command_execute", {"command": command})
-        stdout_acc: list[str] = []
-        process: subprocess.Popen[str] | None = None
+        stdout_acc: list[bytes] = []
+        process: subprocess.Popen[bytes] | None = None
 
         try:
             process = subprocess.Popen(

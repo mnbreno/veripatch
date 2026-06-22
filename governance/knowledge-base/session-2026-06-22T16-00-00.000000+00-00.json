@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-06-22T16:00:00.000000+00:00",
+  "milestone": "v1.3.0-gap-closure",
+  "agent": "delegation-manager",
+  "summary": "Implemented requirements gap-closure: plain-language accessible GUI with tooltips, elevated backend relaunch for one-click updates, configurable apply timeout, and in-repo agent governance scaffold.",
+  "artifacts_changed": [
+    "gui/app/ui/view_model.lua",
+    "gui/app/ui/main_frame.lua",
+    "gui/app/win_silent.lua",
+    "gui/app/ipc/client.lua",
+    "gui/main.lua",
+    "gui/spec/view_model_spec.lua",
+    "scripts/start-backend-elevated.ps1",
+    "backend/veripatch/config.py",
+    "backend/veripatch/updaters/base.py",
+    "governance/POLICY.md",
+    "governance/milestones/v1.3.0-gap-closure.json",
+    "governance/knowledge-base/INDEX.md",
+    "governance/agents/delegation-manager.md",
+    "scripts/check-governance-timestamps.py",
+    ".github/workflows/ci.yml",
+    "CONTRIBUTING.md"
+  ],
+  "decisions": [
+    "Winget remains the sole apply path; WUA listing deferred as out of scope",
+    "Governance scaffolded in-repo without restoring private agentmesh package",
+    "Default apply subprocess timeout raised to 1800s via VERIPATCH_APPLY_TIMEOUT"
+  ],
+  "open_items": [],
+  "next_steps": [
+    "Tag v1.3.0 after milestone exit criteria verified in CI",
+    "Promote staging to main via PR with release consensus"
+  ]
+}

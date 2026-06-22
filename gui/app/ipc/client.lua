@@ -381,6 +381,15 @@ function ipc:start()
   return self:ensure_backend()
 end
 
+function ipc:reset_backend_session()
+  self._backend_ready = false
+  self._spawn_attempted = false
+end
+
+function ipc:mark_backend_managed()
+  self._spawn_attempted = true
+end
+
 function ipc:close()
   return true
 end

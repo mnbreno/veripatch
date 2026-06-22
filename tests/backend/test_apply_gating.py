@@ -61,7 +61,7 @@ def test_apply_requires_elevation_when_not_elevated(_mock: object) -> None:
         }
     )
     assert result["success"] is False
-    assert "Elevation" in result["message"]
+    assert "Administrator" in result["message"]
 
 
 def test_diagnostics_handler() -> None:

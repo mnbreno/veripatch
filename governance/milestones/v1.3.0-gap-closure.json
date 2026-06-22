@@ -1,0 +1,14 @@
+{
+  "id": "v1.3.0-gap-closure",
+  "goal": "Close VeriPatch requirements gaps: accessible UI, one-click elevation, and agent governance scaffolding",
+  "start": "2026-06-22T12:00:00.000000+00:00",
+  "due": "2026-06-29T23:59:59.000000+00:00",
+  "owner_agent": "delegation-manager",
+  "exit_criteria": [
+    "All interactive GUI controls have descriptive tooltips and plain-language labels",
+    "Update All completes after one UAC approval when administrator access is required",
+    "governance/ tree exists with POLICY, milestones, knowledge-base, and delegation agent",
+    "CI runs scripts/check-governance-timestamps.py on every push and pull request",
+    "Windows installer build scripts finalized and MIT license verified in pyproject.toml"
+  ]
+}

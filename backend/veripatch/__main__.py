@@ -61,13 +61,12 @@ def main() -> None:
     if args.port is not None:
         if args.write_port_file:
             write_port_file(args.port)
-        server = SocketJsonRpcServer(host=args.host, port=args.port, debug=args.debug)
-        server.serve_forever()
+        SocketJsonRpcServer(host=args.host, port=args.port, debug=args.debug).serve_forever()
         return
 
     if args.serve:
-        server = JsonRpcServer(debug=args.debug)
-        server.serve_forever()
+        JsonRpcServer(debug=args.debug).serve_forever()
+        return
 
 
 if __name__ == "__main__":

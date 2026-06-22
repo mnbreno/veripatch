@@ -15,7 +15,8 @@
 #>
 param(
     [string]$Version = "",
-    [string]$WxLuaDir = ""
+    [string]$WxLuaDir = "",
+    [switch]$PortableZipOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,20 +28,37 @@ $GuiDir = Join-Path $ProjectRoot "gui"
 $PackagingDir = Join-Path $ProjectRoot "packaging\windows"
 $ArtifactsDir = Join-Path $ProjectRoot "artifacts"
 $StagingDir = Join-Path $PackagingDir "staging"
+$UseSfxFallback = $false
 
 if (-not $Version) {
-    $Version = & python -c "import pathlib,re; t=pathlib.Path(r'$BackendDir/pyproject.toml').read_text(); m=re.search(r'version\s*=\s*\"([^\"]+)\"', t); print(m.group(1))"
+    $pyproject = Get-Content (Join-Path $BackendDir "pyproject.toml") -Raw
+    if ($pyproject -match 'version\s*=\s*"([^"]+)"') {
+        $Version = $Matches[1]
+    } else {
+        throw "Could not read version from backend/pyproject.toml"
+    }
 }
 
 Write-Host "Building VeriPatch $Version Windows installer..." -ForegroundColor Cyan
 
-$Iscc = Get-Command iscc.exe -ErrorAction SilentlyContinue
-if (-not $Iscc) {
-    $DefaultIscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-    if (Test-Path $DefaultIscc) {
-        $Iscc = @{ Source = $DefaultIscc }
-    } else {
-        Write-Error "Inno Setup 6 not found. Install from https://jrsoftware.org/isinfo.php and add iscc.exe to PATH."
+if (-not $PortableZipOnly) {
+    $Iscc = Get-Command iscc.exe -ErrorAction SilentlyContinue
+    if (-not $Iscc) {
+        $IsccCandidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe")
+        )
+        foreach ($candidate in $IsccCandidates) {
+            if (Test-Path $candidate) {
+                $Iscc = @{ Source = $candidate }
+                break
+            }
+        }
+    }
+    $UseSfxFallback = -not $Iscc
+    if ($UseSfxFallback) {
+        Write-Warning "Inno Setup 6 not found; building self-extracting installer (7-Zip SFX) instead."
     }
 }
 
@@ -81,6 +99,7 @@ if (-not (Test-Path $GetPip)) {
 
 $PythonExe = Join-Path $PythonDir "python.exe"
 & $PythonExe $GetPip --no-warn-script-location | Out-Null
+& $PythonExe -m pip install --no-warn-script-location --upgrade pip setuptools wheel | Out-Null
 & $PythonExe -m pip install --no-warn-script-location "$BackendDir" | Out-Null
 
 # Application files
@@ -107,6 +126,97 @@ $env:VERIPATCH_PYTHON = Join-Path $InstallRoot "python\pythonw.exe"
 $env:VERIPATCH_LUA = Join-Path $InstallRoot "app\tools\wxlua542\bin\64bit\wxLua.exe"
 & (Join-Path $InstallRoot "app\scripts\start-gui.ps1")
 '@ | Set-Content -Path (Join-Path $StagingDir "VeriPatch.ps1") -Encoding UTF8
+
+if ($PortableZipOnly) {
+    $PortableZip = Join-Path $ArtifactsDir "VeriPatch-$Version-Windows-Portable.zip"
+    if (Test-Path $PortableZip) {
+        Remove-Item -Force $PortableZip
+    }
+    Compress-Archive -Path (Join-Path $StagingDir "*") -DestinationPath $PortableZip
+    Write-Host "Built portable ZIP $PortableZip" -ForegroundColor Green
+    return
+}
+
+$OutputExe = Join-Path $ArtifactsDir "VeriPatch-$Version-Setup.exe"
+if (Test-Path $OutputExe) {
+    Remove-Item -Force $OutputExe
+}
+
+if ($UseSfxFallback) {
+    $SevenZipVersion = "2409"
+    $ExtraZip = "7z$SevenZipVersion-extra.7z"
+    $ExtraUrl = "https://www.7-zip.org/a/$ExtraZip"
+    $ExtraCache = Join-Path $EmbedCache $ExtraZip
+    if (-not (Test-Path $ExtraCache)) {
+        Write-Host "Downloading 7-Zip extra tools..."
+        Invoke-WebRequest -Uri $ExtraUrl -OutFile $ExtraCache
+    }
+    $SevenZipDir = Join-Path $PackagingDir "cache\7zip-extra"
+    if (-not (Test-Path (Join-Path $SevenZipDir "7z.exe"))) {
+        if (Test-Path $SevenZipDir) {
+            Remove-Item -Recurse -Force $SevenZipDir
+        }
+        New-Item -ItemType Directory -Path $SevenZipDir -Force | Out-Null
+        $SevenZipExe = Join-Path $EmbedCache "7zr.exe"
+        if (-not (Test-Path $SevenZipExe)) {
+            Invoke-WebRequest -Uri "https://www.7-zip.org/a/7zr.exe" -OutFile $SevenZipExe
+        }
+        & $SevenZipExe x $ExtraCache "-o$SevenZipDir" -y | Out-Null
+    }
+    $SevenZ = Join-Path $SevenZipDir "7z.exe"
+    $SfxModule = Join-Path $SevenZipDir "7zSD.sfx"
+    if (-not (Test-Path $SevenZ) -or -not (Test-Path $SfxModule)) {
+        throw "7-Zip SFX tools missing after extract; expected $SevenZ and $SfxModule"
+    }
+
+    @"
+`$ErrorActionPreference = 'Stop'
+`$InstallDir = Join-Path `$env:LOCALAPPDATA 'VeriPatch'
+`$SourceDir = `$PSScriptRoot
+if (Test-Path `$InstallDir) {
+    Remove-Item -Recurse -Force `$InstallDir
+}
+New-Item -ItemType Directory -Path `$InstallDir -Force | Out-Null
+Copy-Item -Recurse -Force (Join-Path `$SourceDir '*') `$InstallDir
+`$Launcher = Join-Path `$InstallDir 'VeriPatch.ps1'
+`$Wsh = New-Object -ComObject WScript.Shell
+`$Shortcut = `$Wsh.CreateShortcut((Join-Path `$env:USERPROFILE 'Desktop\VeriPatch.lnk'))
+`$Shortcut.TargetPath = 'powershell.exe'
+`$Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"`$Launcher`""
+`$Shortcut.WorkingDirectory = `$InstallDir
+`$Shortcut.Save()
+Write-Host "VeriPatch $Version installed to `$InstallDir"
+"@ | Set-Content -Path (Join-Path $StagingDir "install.ps1") -Encoding UTF8
+
+    $Archive7z = Join-Path $ArtifactsDir "VeriPatch-$Version-staging.7z"
+    if (Test-Path $Archive7z) {
+        Remove-Item -Force $Archive7z
+    }
+    & $SevenZ a -t7z -mx=9 $Archive7z (Join-Path $StagingDir "*") | Out-Null
+
+    $SfxConfig = Join-Path $PackagingDir "sfx-config.txt"
+    @"
+;!@Install@!UTF-8!
+Title="VeriPatch $Version Setup"
+BeginPrompt="Install VeriPatch $Version to %LOCALAPPDATA%\VeriPatch?"
+RunProgram="powershell.exe -NoProfile -ExecutionPolicy Bypass -File install.ps1"
+;!@InstallEnd@!
+"@ | Set-Content -Path $SfxConfig -Encoding UTF8
+
+    $SfxParts = @($SfxModule, $SfxConfig, $Archive7z)
+    $Fs = [System.IO.File]::Open($OutputExe, [System.IO.FileMode]::Create)
+    try {
+        foreach ($part in $SfxParts) {
+            $bytes = [System.IO.File]::ReadAllBytes($part)
+            $Fs.Write($bytes, 0, $bytes.Length)
+        }
+    } finally {
+        $Fs.Close()
+    }
+    Remove-Item -Force $Archive7z
+    Write-Host "Built SFX installer $OutputExe" -ForegroundColor Green
+    return
+}
 
 Write-Host "Compiling installer..."
 & $Iscc.Source `

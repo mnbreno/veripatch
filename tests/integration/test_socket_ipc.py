@@ -59,7 +59,9 @@ def test_socket_apply_updates_stream(socket_server: int) -> None:
     assert result["dry_run"] is True
 
 
-def test_get_client_uses_socket_when_port_env(monkeypatch: pytest.MonkeyPatch, socket_server: int) -> None:
+def test_get_client_uses_socket_when_port_env(
+    monkeypatch: pytest.MonkeyPatch, socket_server: int
+) -> None:
     monkeypatch.setenv("VERIPATCH_IPC_PORT", str(socket_server))
     client = get_client()
     assert isinstance(client, SocketJsonRpcClient)

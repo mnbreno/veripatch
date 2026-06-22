@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+from veripatch.config import apply_command_timeout
 from veripatch.detection.os_detect import OSInfo
 from veripatch.execution.runner import CommandRunner, ExecutionResult
 from veripatch.privileges.audit import AuditLogger
@@ -88,6 +89,7 @@ class Updater(ABC):
             self.validator,
             self.audit,
             dry_run=dry_run,
+            timeout=apply_command_timeout(),
         )
 
     @abstractmethod

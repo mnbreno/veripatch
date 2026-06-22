@@ -6,15 +6,15 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from veripatch.ipc.client import SocketJsonRpcClient, get_client
 
 
 def _load_params(args: argparse.Namespace) -> dict[str, Any]:
     if args.params_file:
-        return json.loads(Path(args.params_file).read_text(encoding="utf-8"))
-    return json.loads(args.params)
+        return cast(dict[str, Any], json.loads(Path(args.params_file).read_text(encoding="utf-8")))
+    return cast(dict[str, Any], json.loads(args.params))
 
 
 def run_rpc(argv: list[str] | None = None) -> int:

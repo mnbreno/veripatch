@@ -1,2 +1,25 @@
-# VeriPatch code owners
+# VeriPatch code owners — approval roles for quality gates
+#
+# G6 Engineering lead: required approval before merge to staging
+# G7 Release manager: required approval before production release
+#
+# Configure GitHub Environments:
+#   staging-promotion  → required reviewer: @mnbreno (engineering lead)
+#   production-release → required reviewer: @mnbreno (release manager)
+
+# Engineering lead owns application code (staging promotion gate G6)
+/backend/          @mnbreno
+/gui/              @mnbreno
+/tests/            @mnbreno
+/scripts/          @mnbreno
+
+# Release manager owns release artifacts and consensus (production gate G7)
+/release/          @mnbreno
+packaging/         @mnbreno
+.github/workflows/release.yml  @mnbreno
+
+# Governance policies
+/governance/       @mnbreno
+
+# Default
 * @mnbreno

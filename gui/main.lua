@@ -68,6 +68,7 @@ local frame = MainFrame.new(nil, {
   args = {"-m", "veripatch"},
   cwd = backend_cwd,
   gui_root = normalize_path(gui_root),
+  project_root = normalize_path(gui_root .. ".."),
 })
 
 frame:build()

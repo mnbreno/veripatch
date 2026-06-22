@@ -92,6 +92,29 @@ function M.sleep_ms(ms, wx)
   os.execute("sleep " .. tostring(ms / 1000))
 end
 
+function M.spawn_elevated_backend(project_root, port, python_exe)
+  if not M.is_windows() or not project_root or project_root == "" then
+    return false
+  end
+  local ps1 = project_root .. "\\scripts\\start-backend-elevated.ps1"
+  local handle = io.open(ps1, "r")
+  if not handle then
+    return false
+  end
+  handle:close()
+
+  local cmd = string.format(
+    'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%s" -Port %d -ProjectRoot "%s"',
+    ps1:gsub('"', '""'),
+    port or 8765,
+    project_root:gsub('"', '""')
+  )
+  if python_exe and python_exe ~= "" then
+    cmd = cmd .. string.format(' -PythonExe "%s"', tostring(python_exe):gsub('"', '""'))
+  end
+  return M.run_hidden(cmd)
+end
+
 function M.spawn_backend(project_root, port, python_exe)
   if not project_root or project_root == "" then
     return false

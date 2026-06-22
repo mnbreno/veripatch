@@ -9,12 +9,14 @@ Thank you for contributing to VeriPatch. This project enforces strict source val
 3. Run tests: `pytest tests/ -v`
 4. Install wxLua for GUI development (optional)
 
-## Branch Strategy
+## Development Workflow
 
-- **`staging`** — All feature development merges here first
-- **`main`** — Production/stable releases only; no direct pushes
+| Branch    | Purpose                          |
+|-----------|----------------------------------|
+| `staging` | Active development and pre-production |
+| `main`    | Stable production releases       |
 
-Create feature branches from `staging` and open PRs targeting `staging`.
+Agents may commit autonomously to **`staging`** or **`main`** when changes **compile successfully** (G1). See [governance/QUALITY_GATES.md](governance/QUALITY_GATES.md) and [governance/POLICY.md](governance/POLICY.md).
 
 ## Pull Request Requirements
 
@@ -25,7 +27,9 @@ Create feature branches from `staging` and open PRs targeting `staging`.
 
 ## Iteration Governance
 
-Every development cycle (milestone/iteration) follows these rules:
+Every development cycle (milestone/iteration) follows these rules. The [Delegation Manager agent](governance/agents/delegation-manager.md) defines PR cadence, commit frequency, and issue workflows in detail.
+
+See also [governance/POLICY.md](governance/POLICY.md) for timestamp and knowledge-base requirements.
 
 ### 1. Mandatory Issue Triage (Start of Cycle)
 
@@ -54,6 +58,19 @@ At iteration end:
 2. Verify all assigned issues meet the criteria above
 3. Close the milestone only when all issues are accounted for
 4. Document iteration summary in release notes or milestone description
+5. Append a timestamped session record to `governance/knowledge-base/` per [governance/knowledge-base/INDEX.md](governance/knowledge-base/INDEX.md)
+
+## Agent-assisted contributions
+
+Agent-generated commits should include governance trailers:
+
+```
+Agent: <agent-id>
+Timestamp: <iso8601-utc>
+Milestone: <milestone-id>
+```
+
+CI validates governance artifacts via `scripts/check-governance-timestamps.py`.
 
 ## Code Standards
 

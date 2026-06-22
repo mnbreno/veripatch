@@ -38,6 +38,8 @@ desktop.ini
 
 # Build artifacts
 artifacts/
+artifacts-compile-gate/
+artifacts-quality-gates/
 packaging/windows/staging/
 packaging/windows/cache/
 packaging/release-zip/

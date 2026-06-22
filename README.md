@@ -82,19 +82,13 @@ VeriPatch **never** downloads or installs software from unofficial sources. All 
 
 ## Status
 
-**v1.0.0** — first stable release.
+**v1.3.0** — stable release (gap-closure, governance policies, mandatory quality gates).
 
 - Cross-platform OS detection (Windows, macOS, Linux with APT/DNF/Pacman/Zypper)
 - Official source registry with command validation (blocks unofficial update channels)
-- `CommandRunner` with source validation, dry-run, timeouts, and audit logging
-- Real `list_updates` / `apply` via official CLIs (winget, softwareupdate, apt/dnf/pacman/zypper)
-- JSON-RPC IPC server over stdin/stdout (6 methods)
-- Elevation detection + UAC/sudo guidance; apply requires confirmation token
-- Append-only audit logging for all privileged and validation actions
-- Structured logging (`VERIPATCH_LOG`), `diagnostics` JSON-RPC method
-- CLI output parsers for winget, softwareupdate, apt, dnf, pacman, zypper
-- 104 unit + integration tests with 86% code coverage
-- CI/CD with cross-platform testing on every PR (Ubuntu, macOS, Windows; Python 3.11 & 3.12)
+- Accessible GUI with tooltips, plain language, and one-click elevation on Windows
+- Near-full agent autonomy: commits allowed on `staging`/`main` when G1 compilation passes
+- Mandatory CI quality gates G1-G8 (100% compile, 90%+ unit pass, integration, static analysis)
 
 Set `VERIPATCH_DRY_RUN=1` to force dry-run mode for the backend IPC server.
 

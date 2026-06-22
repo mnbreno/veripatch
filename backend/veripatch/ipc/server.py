@@ -168,7 +168,7 @@ class JsonRpcServer:
                 return dry_run, {
                     "success": False,
                     "dry_run": False,
-                    "message": "Elevation required. Re-run VeriPatch as administrator/root.",
+                    "message": "Administrator access is required to install updates.",
                     "errors": ["Insufficient privileges for apply"],
                     "items": [],
                 }

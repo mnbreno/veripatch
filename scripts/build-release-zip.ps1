@@ -16,7 +16,12 @@ $ArtifactsDir = Join-Path $ProjectRoot "artifacts"
 $StageRoot = Join-Path $ProjectRoot "packaging\release-zip"
 
 if (-not $Version) {
-    $Version = & python -c "import pathlib,re; t=pathlib.Path(r'$BackendDir/pyproject.toml').read_text(); m=re.search(r'version\s*=\s*\"([^\"]+)\"', t); print(m.group(1))"
+    $pyproject = Get-Content (Join-Path $BackendDir "pyproject.toml") -Raw
+    if ($pyproject -match 'version\s*=\s*"([^"]+)"') {
+        $Version = $Matches[1]
+    } else {
+        throw "Could not read version from backend/pyproject.toml"
+    }
 }
 
 $BundleDir = Join-Path $StageRoot "VeriPatch-$Version"

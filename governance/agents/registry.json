@@ -1,0 +1,102 @@
+{
+  "schema_version": "1",
+  "last_updated": "2026-06-22T18:00:00.000000+00:00",
+  "agents": [
+    {
+      "id": "delegation-manager",
+      "full_name": "Jordan Hale — Delegation Manager",
+      "codename": "Jordan Hale",
+      "role": "Delegation Manager",
+      "division": "project-management",
+      "emoji": "🎬",
+      "work_doc": "governance/agents/work/delegation-manager.md",
+      "spec_doc": "governance/agents/delegation-manager.md",
+      "release_gate_required": false,
+      "summary": "Schedules PRs, commits, issue triage, and milestone ownership for the repository."
+    },
+    {
+      "id": "backend-architect",
+      "full_name": "Morgan Chen — Backend Architect",
+      "codename": "Morgan Chen",
+      "role": "Backend Architect",
+      "division": "engineering",
+      "emoji": "🏗️",
+      "work_doc": "governance/agents/work/backend-architect.md",
+      "spec_doc": "governance/agents/backend-architect.md",
+      "release_gate_required": false,
+      "summary": "Designs backend architecture, APIs, data flows, and service boundaries for VeriPatch."
+    },
+    {
+      "id": "code-reviewer",
+      "full_name": "Alex Rivera — Code Reviewer",
+      "codename": "Alex Rivera",
+      "role": "Code Reviewer",
+      "division": "engineering",
+      "emoji": "👁️",
+      "work_doc": "governance/agents/work/code-reviewer.md",
+      "spec_doc": "governance/agents/code-reviewer.md",
+      "release_gate_required": true,
+      "summary": "Reviews changes for security, maintainability, and correctness before merge or release."
+    },
+    {
+      "id": "devops-automator",
+      "full_name": "Riley Santos — DevOps Automator",
+      "codename": "Riley Santos",
+      "role": "DevOps Automator",
+      "division": "engineering",
+      "emoji": "🚀",
+      "work_doc": "governance/agents/work/devops-automator.md",
+      "spec_doc": "governance/agents/devops-automator.md",
+      "release_gate_required": true,
+      "summary": "Owns CI/CD pipelines, build artifacts, installer workflows, and operational automation."
+    },
+    {
+      "id": "technical-writer",
+      "full_name": "Casey Brooks — Technical Writer",
+      "codename": "Casey Brooks",
+      "role": "Technical Writer",
+      "division": "engineering",
+      "emoji": "📚",
+      "work_doc": "governance/agents/work/technical-writer.md",
+      "spec_doc": "governance/agents/technical-writer.md",
+      "release_gate_required": false,
+      "summary": "Produces developer and user documentation from architecture and review artifacts."
+    },
+    {
+      "id": "reality-checker",
+      "full_name": "Quinn Morgan — Reality Checker",
+      "codename": "Quinn Morgan",
+      "role": "Reality Checker",
+      "division": "engineering",
+      "emoji": "✅",
+      "work_doc": "governance/agents/work/reality-checker.md",
+      "spec_doc": "governance/agents/reality-checker.md",
+      "release_gate_required": true,
+      "summary": "Final production-readiness gate; blocks release when evidence is missing."
+    },
+    {
+      "id": "orchestrator",
+      "full_name": "Nova Ashford — Workflow Orchestrator",
+      "codename": "Nova Ashford",
+      "role": "Workflow Orchestrator",
+      "division": "coordination",
+      "emoji": "🎭",
+      "work_doc": "governance/agents/work/orchestrator.md",
+      "spec_doc": "governance/agents/orchestrator.md",
+      "release_gate_required": false,
+      "summary": "Dispatches multi-agent workflows and routes tasks across the agent mesh."
+    },
+    {
+      "id": "scheduler",
+      "full_name": "Taylor Kim — Parallel Scheduler",
+      "codename": "Taylor Kim",
+      "role": "Parallel Scheduler",
+      "division": "coordination",
+      "emoji": "⏱️",
+      "work_doc": "governance/agents/work/scheduler.md",
+      "spec_doc": "governance/agents/scheduler.md",
+      "release_gate_required": false,
+      "summary": "Runs parallel agent tasks and in-memory workflow kickoffs."
+    }
+  ]
+}

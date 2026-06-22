@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here.
 
+## [1.3.0] — 2026-06-22
+
+### VeriPatch
+
+- Accessible GUI: plain-language labels, tooltips on all controls, mnemonics, bold section headers
+- One-click elevation: UAC relaunch via `start-backend-elevated.ps1` with backend reconnect
+- Configurable apply timeout (`VERIPATCH_APPLY_TIMEOUT`, default 1800s)
+- Agent governance scaffold: registry, work docs, milestones, knowledge base
+- **Agent autonomy:** agents may commit to `staging`/`main` when changes compile successfully (G1)
+- **Mandatory quality gates G1-G8:** 100% compile, 90% unit pass rate, integration tests, static analysis
+- CI/CD: `staging-promotion`, `production-release` environment gates
+- Windows installer SFX fallback when Inno Setup unavailable
+
 ## [1.2.0] — 2026-06-22
 
 ### VeriPatch

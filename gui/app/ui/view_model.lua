@@ -9,28 +9,71 @@ ViewModel.CURSOR_PACKAGE_ID = "Anysphere.Cursor"
 
 ViewModel.STATUS = {
   READY = "Ready",
-  CONNECTING = "Connecting to backend...",
+  CONNECTING = "Checking for updates...",
   LOADED = "Updates loaded",
-  LOAD_FAILED = "Update check failed",
-  OS_FAILED = "Failed to detect OS",
+  LOAD_FAILED = "Could not check for updates",
+  OS_FAILED = "Could not detect your computer",
+  ELEVATION_CANCELLED = "Update cancelled — administrator access is required",
+  ELEVATION_PENDING = "Waiting for administrator approval...",
 }
+
+ViewModel.UI = {
+  WINDOW_TITLE = "VeriPatch — Easy software updates",
+  SECTION_SYSTEM = "About your computer",
+  SECTION_SOURCES = "Trusted update sources",
+  SECTION_UPDATES = "Available updates (check items to install)",
+  SECTION_LOG = "Activity log",
+  DIALOG_ELEVATION_TITLE = "Administrator access required",
+}
+
+ViewModel.TOOLTIPS = {
+  refresh = "Check again for new updates from trusted sources.",
+  elevate = "Restart the update service with administrator rights so installs can finish.",
+  preview = "See what would be installed without making any changes to your computer.",
+  update_selected = "Install only the updates you checked in the list above.",
+  update_all = "Install every available update from trusted sources in one step.",
+  update_cursor = "Install the Cursor editor update after you close Cursor completely.",
+  sources_list = "Official places VeriPatch checks for updates, such as Microsoft WinGet.",
+  updates_list = "Updates ready to install. Check the boxes for items you want, then choose an action below.",
+  activity_log = "Step-by-step progress while VeriPatch checks for or installs updates.",
+  status = "Current status of your update session.",
+}
+
+function ViewModel.control_tooltip(control_id)
+  return ViewModel.TOOLTIPS[control_id] or ""
+end
+
+function ViewModel.all_tooltip_ids()
+  return {
+    "refresh",
+    "elevate",
+    "preview",
+    "update_selected",
+    "update_all",
+    "update_cursor",
+    "sources_list",
+    "updates_list",
+    "activity_log",
+    "status",
+  }
+end
 
 function ViewModel.format_os_label(os_result, os_err)
   if not os_result then
-    return "Backend error: " .. tostring(os_err or "unknown"), ViewModel.STATUS.OS_FAILED
+    return "Could not reach the update service: " .. tostring(os_err or "unknown"), ViewModel.STATUS.OS_FAILED
   end
 
   local os = os_result.os or {}
-  local elevated = os_result.elevated and "Yes" or "No"
+  local admin_label = os_result.elevated and "Yes" or "No"
   local label = string.format(
-    "OS: %s | Version: %s | Arch: %s | Elevated: %s",
+    "Computer: %s | Version: %s | Type: %s | Administrator access: %s",
     os.os_type or "?",
     os.version or "?",
     os.architecture or "?",
-    elevated
+    admin_label
   )
   if os.distro_name then
-    label = label .. " | Distro: " .. os.distro_name
+    label = label .. " | Edition: " .. os.distro_name
   end
   return label, nil
 end
@@ -39,11 +82,11 @@ function ViewModel.format_source_rows(src_result, src_err)
   local rows = {}
   if src_result and src_result.sources then
     for _, source in ipairs(src_result.sources) do
-      table.insert(rows, source.name .. " (" .. source.id .. ")")
+      table.insert(rows, source.name or source.id or "Unknown source")
     end
     return rows, nil
   end
-  table.insert(rows, "Failed to load sources: " .. tostring(src_err or "unknown"))
+  table.insert(rows, "Could not load update sources: " .. tostring(src_err or "unknown"))
   return rows, "source_error"
 end
 
@@ -57,7 +100,7 @@ function ViewModel.parse_update_items(upd_result)
         title = item.title,
         source_id = item.source_id,
         package_id = metadata.package_id,
-        display = item.title .. " [" .. item.source_id .. "]",
+        display = item.title or item.id or "Update",
       })
     end
   end
@@ -74,7 +117,7 @@ function ViewModel.format_update_rows(upd_result, upd_err)
     return rows, ViewModel.STATUS.LOADED
   end
   if upd_err or not upd_result then
-    table.insert(rows, "Failed to check updates: " .. tostring(upd_err or "unknown"))
+    table.insert(rows, "Could not check for updates: " .. tostring(upd_err or "unknown"))
     return rows, ViewModel.STATUS.LOAD_FAILED
   end
   table.insert(rows, "No updates available")
@@ -102,46 +145,53 @@ end
 
 function ViewModel.cursor_gate_message()
   return table.concat({
-    "Cursor is running and has an available update.",
+    "Cursor is open and has an update waiting.",
     "",
-    "Yes = Skip Cursor and update other packages",
+    "Yes = Skip Cursor and update everything else",
     "No = Cancel this update run",
     "",
     "Close Cursor completely, then use 'Update Cursor Later'.",
   }, "\n")
 end
 
+function ViewModel.refresh_button_label()
+  return "&Refresh"
+end
+
+function ViewModel.elevate_button_label()
+  return "Run as &administrator"
+end
+
 function ViewModel.apply_button_label(dry_run)
   if dry_run then
-    return "Apply (Dry Run)"
+    return "&Preview updates (no changes)"
   end
-  return "Apply Updates"
+  return "Install updates"
 end
 
 function ViewModel.update_selected_button_label()
-  return "Update Selected"
+  return "Update &selected"
 end
 
 function ViewModel.update_all_button_label()
-  return "Update All"
+  return "Update &all"
 end
 
 function ViewModel.update_cursor_later_button_label()
-  return "Update Cursor Later"
+  return "Update Cursor &later"
 end
 
 function ViewModel.confirm_update_all_message()
   return table.concat({
-    "Install all available updates from official sources?",
+    "Install all available updates from trusted sources?",
     "",
-    "This uses WinGet, Windows Update, apt, or other vendor tools.",
-    "Apps may restart and some updates may require a reboot.",
+    "Apps may restart and your computer may ask you to restart when finished.",
   }, "\n")
 end
 
 function ViewModel.confirm_update_selected_message(count)
   return string.format(
-    "Install %d selected update(s) from official sources?",
+    "Install %d selected update(s) from trusted sources?",
     count or 0
   )
 end
@@ -156,21 +206,21 @@ end
 
 function ViewModel.confirm_elevation_message()
   return table.concat({
-    "Administrator privileges are required to install updates.",
+    "Administrator access is required to install updates.",
     "",
-    "Request elevation now?",
+    "Allow VeriPatch to continue with administrator rights?",
   }, "\n")
 end
 
 function ViewModel.can_apply_real(elevated, confirmed, confirm_token)
   if not elevated then
-    return false, "Administrator/root privileges required for real apply"
+    return false, "Administrator access is required to install updates"
   end
   if not confirmed then
-    return false, "Confirmation required before applying updates"
+    return false, "Please confirm before installing updates"
   end
   if confirm_token ~= config.APPLY_CONFIRMATION_TOKEN then
-    return false, "Invalid confirmation token"
+    return false, "Update could not be confirmed. Please try again."
   end
   return true, nil
 end
@@ -206,28 +256,28 @@ end
 
 function ViewModel.format_apply_status(result, err, dry_run)
   if not result then
-    return text.repair_mojibake("Apply failed: " .. tostring(err or "unknown error"))
+    return text.repair_mojibake("Install failed: " .. tostring(err or "unknown error"))
   end
 
   local summary_text = ViewModel.format_apply_summary(result)
   if dry_run then
     if summary_text then
-      return "Dry run complete: " .. summary_text
+      return "Preview complete: " .. summary_text
     end
     local count = result.items and #result.items or 0
-    return string.format("Dry run complete: %s (%d items)", result.message or "done", count)
+    return string.format("Preview complete: %s (%d items)", result.message or "done", count)
   end
 
   if summary_text then
     if result.success then
-      return "Apply complete: " .. text.repair_mojibake(summary_text)
+      return "Install complete: " .. text.repair_mojibake(summary_text)
     end
-    return "Partial update: " .. text.repair_mojibake(summary_text) .. " — see Process Output"
+    return "Some updates did not finish: " .. text.repair_mojibake(summary_text) .. " — see Activity log"
   end
 
   if result.success then
     return string.format(
-      "Apply complete: %s",
+      "Install complete: %s",
       text.repair_mojibake(result.message or "done")
     )
   end
@@ -236,34 +286,41 @@ function ViewModel.format_apply_status(result, err, dry_run)
     local primary = text.repair_mojibake(result.errors[1])
     if #result.errors > 1 then
       return string.format(
-        "Apply failed (%d issues). %s — see Process Output",
+        "Install failed (%d issues). %s — see Activity log",
         #result.errors,
         primary
       )
     end
-    return "Apply failed: " .. primary
+    return "Install failed: " .. primary
   end
 
-  return text.repair_mojibake("Apply failed: " .. (result.message or "unknown error"))
+  return text.repair_mojibake("Install failed: " .. (result.message or "unknown error"))
 end
 
 function ViewModel.format_elevation_status(result, err)
   if not result then
-    return "Elevation check failed: " .. tostring(err or "unknown")
+    return "Could not check administrator access: " .. tostring(err or "unknown")
   end
   if result.elevated then
-    return "Running with administrator/root privileges"
+    return "Running with administrator access"
   end
   if result.spawned then
-    return "UAC elevation prompt launched — approve to continue"
+    return "Approve the Windows security prompt to continue"
   end
   if result.suggested_sudo then
-    return "Re-run with: " .. result.suggested_sudo
+    return "Restart VeriPatch with administrator rights: " .. result.suggested_sudo
   end
   if result.suggested then
     return result.suggested
   end
-  return result.message or "Elevation required for real apply"
+  return result.message or "Administrator access is required to install updates"
+end
+
+function ViewModel.format_apply_timeout_message(timeout_seconds)
+  return string.format(
+    "An update step took longer than %d minutes. You can try again or set VERIPATCH_APPLY_TIMEOUT for more time.",
+    math.floor((timeout_seconds or 300) / 60)
+  )
 end
 
 function ViewModel.selected_package_ids(update_items, checked_indices)

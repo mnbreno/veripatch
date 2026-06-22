@@ -4,6 +4,7 @@ local ipc = require("app.ipc.client")
 local ViewModel = require("app.ui.view_model")
 local config = require("app.config")
 local text = require("app.ui.text")
+local win_silent = require("app.win_silent")
 local wx = require("wx")
 
 local MainFrame = {}
@@ -35,6 +36,42 @@ local function append_utf8(text_ctrl, msg)
   else
     text_ctrl:AppendText(line)
   end
+end
+
+local function set_control_tooltip(control, tooltip_id)
+  if not control or not tooltip_id then
+    return
+  end
+  local tip = ViewModel.control_tooltip(tooltip_id)
+  if tip == "" then
+    return
+  end
+  if control.SetToolTip then
+    control:SetToolTip(to_wx_string(tip))
+  end
+  if control.SetHelpText then
+    control:SetHelpText(to_wx_string(tip))
+  end
+end
+
+local function set_section_title_font(static_box, frame)
+  if not static_box or not static_box.GetStaticBox then
+    return
+  end
+  local box = static_box:GetStaticBox()
+  if not box then
+    return
+  end
+  local base_font = wx.wxSystemSettings.GetFont(wx.wxSYS_DEFAULT_GUI_FONT)
+  local title_font = wx.wxFont(
+    base_font:GetPointSize() + 1,
+    base_font:GetFamily(),
+    base_font:GetStyle(),
+    wx.wxFONTWEIGHT_BOLD,
+    base_font:GetUnderlined(),
+    base_font:GetFaceName()
+  )
+  box:SetFont(title_font)
 end
 
 function MainFrame.new(parent, backend_config)
@@ -123,7 +160,7 @@ function MainFrame:build()
   self.frame = wx.wxFrame(
     self.parent or wx.NULL,
     wx.wxID_ANY,
-    "VeriPatch - Official Source Updates",
+    ViewModel.UI.WINDOW_TITLE,
     wx.wxDefaultPosition,
     wx.wxSize(760, 760)
   )
@@ -136,28 +173,39 @@ function MainFrame:build()
   panel:SetFont(default_font)
   local sizer = wx.wxBoxSizer(wx.wxVERTICAL)
 
-  local os_box = wx.wxStaticBox(panel, wx.wxID_ANY, "System Information")
+  local os_box = wx.wxStaticBox(panel, wx.wxID_ANY, ViewModel.UI.SECTION_SYSTEM)
   local os_sizer = wx.wxStaticBoxSizer(os_box, wx.wxVERTICAL)
-  self.os_label = wx.wxStaticText(panel, wx.wxID_ANY, "Detecting operating system...")
+  set_section_title_font(os_sizer, self.frame)
+  self.os_label = wx.wxStaticText(panel, wx.wxID_ANY, "Detecting your computer...")
   os_sizer:Add(self.os_label, 0, wx.wxALL, 5)
 
-  local src_box = wx.wxStaticBox(panel, wx.wxID_ANY, "Official Update Sources")
+  local src_box = wx.wxStaticBox(panel, wx.wxID_ANY, ViewModel.UI.SECTION_SOURCES)
   local src_sizer = wx.wxStaticBoxSizer(src_box, wx.wxVERTICAL)
+  set_section_title_font(src_sizer, self.frame)
   self.sources_list = wx.wxListBox(panel, wx.wxID_ANY)
+  set_control_tooltip(self.sources_list, "sources_list")
   src_sizer:Add(self.sources_list, 1, wx.wxEXPAND + wx.wxALL, 5)
 
-  local upd_box = wx.wxStaticBox(panel, wx.wxID_ANY, "Available Updates (check to select)")
+  local upd_box = wx.wxStaticBox(panel, wx.wxID_ANY, ViewModel.UI.SECTION_UPDATES)
   local upd_sizer = wx.wxStaticBoxSizer(upd_box, wx.wxVERTICAL)
+  set_section_title_font(upd_sizer, self.frame)
   self.updates_list = wx.wxCheckListBox(panel, wx.wxID_ANY)
+  set_control_tooltip(self.updates_list, "updates_list")
   upd_sizer:Add(self.updates_list, 2, wx.wxEXPAND + wx.wxALL, 5)
 
   local btn_sizer = wx.wxBoxSizer(wx.wxHORIZONTAL)
-  self.refresh_btn = wx.wxButton(panel, wx.wxID_ANY, "Refresh")
-  self.elevate_btn = wx.wxButton(panel, wx.wxID_ANY, "Request Elevation")
+  self.refresh_btn = wx.wxButton(panel, wx.wxID_ANY, ViewModel.refresh_button_label())
+  self.elevate_btn = wx.wxButton(panel, wx.wxID_ANY, ViewModel.elevate_button_label())
   self.apply_btn = wx.wxButton(panel, wx.wxID_ANY, ViewModel.apply_button_label(true))
   self.update_selected_btn = wx.wxButton(panel, wx.wxID_ANY, ViewModel.update_selected_button_label())
   self.update_all_btn = wx.wxButton(panel, wx.wxID_ANY, ViewModel.update_all_button_label())
   self.update_cursor_btn = wx.wxButton(panel, wx.wxID_ANY, ViewModel.update_cursor_later_button_label())
+  set_control_tooltip(self.refresh_btn, "refresh")
+  set_control_tooltip(self.elevate_btn, "elevate")
+  set_control_tooltip(self.apply_btn, "preview")
+  set_control_tooltip(self.update_selected_btn, "update_selected")
+  set_control_tooltip(self.update_all_btn, "update_all")
+  set_control_tooltip(self.update_cursor_btn, "update_cursor")
   btn_sizer:Add(self.refresh_btn, 0, wx.wxRIGHT, 5)
   btn_sizer:Add(self.elevate_btn, 0, wx.wxRIGHT, 5)
   btn_sizer:Add(self.apply_btn, 0, wx.wxRIGHT, 5)
@@ -167,11 +215,20 @@ function MainFrame:build()
 
   self.status_label = wx.wxStaticText(panel, wx.wxID_ANY, ViewModel.STATUS.READY)
   self.status_label:Wrap(dip_int(self.frame, 700))
+  set_control_tooltip(self.status_label, "status")
+  if self.status_label.SetName then
+    self.status_label:SetName("Status")
+  end
 
-  local log_box = wx.wxStaticBox(panel, wx.wxID_ANY, "Process Output")
+  local log_box = wx.wxStaticBox(panel, wx.wxID_ANY, ViewModel.UI.SECTION_LOG)
   local log_sizer = wx.wxStaticBoxSizer(log_box, wx.wxVERTICAL)
+  set_section_title_font(log_sizer, self.frame)
   self.log_output = wx.wxTextCtrl(panel, wx.wxID_ANY, "",
     wx.wxDefaultPosition, wx.wxDefaultSize, wx.wxTE_MULTILINE + wx.wxTE_READONLY + wx.wxHSCROLL)
+  set_control_tooltip(self.log_output, "activity_log")
+  if self.log_output.SetName then
+    self.log_output:SetName("Activity log")
+  end
   local log_font = wx.wxFont(
     dip_int(self.frame, 10),
     wx.wxFONTFAMILY_TELETYPE,
@@ -309,14 +366,47 @@ function MainFrame:append_log(msg)
 end
 
 function MainFrame:request_elevation()
-  self:set_status("Checking elevation...")
+  self:set_status(ViewModel.STATUS.ELEVATION_PENDING)
+  if win_silent.is_windows() and self.backend_config.project_root then
+    local spawned = win_silent.spawn_elevated_backend(
+      self.backend_config.project_root,
+      self.ipc_client.port,
+      self.backend_config.python_cmd
+    )
+    if spawned then
+      self.ipc_client:mark_backend_managed()
+      if self:_wait_for_elevated_backend() then
+        return
+      end
+    end
+  end
+
   local result, err = self.ipc_client:call("request_elevation", { spawn = true })
   local status = ViewModel.format_elevation_status(result, err)
   self:set_status(status)
   self:append_log(status)
   if result and result.elevated then
     self.elevated = true
+  elseif self:_wait_for_elevated_backend() then
+    return
   end
+end
+
+function MainFrame:_wait_for_elevated_backend()
+  self.ipc_client:reset_backend_session()
+  self.ipc_client:mark_backend_managed()
+  for _ = 1, 40 do
+    win_silent.sleep_ms(500, wx)
+    local os_result = self.ipc_client:call("detect_os")
+    if os_result and os_result.elevated then
+      self.elevated = true
+      local status = ViewModel.format_elevation_status({ elevated = true })
+      self:set_status(status)
+      self:append_log(status)
+      return true
+    end
+  end
+  return false
 end
 
 function MainFrame:_ensure_elevated()
@@ -325,14 +415,19 @@ function MainFrame:_ensure_elevated()
   end
   local answer = wx.wxMessageBox(
     ViewModel.confirm_elevation_message(),
-    "Elevation Required",
+    ViewModel.UI.DIALOG_ELEVATION_TITLE,
     wx.wxYES_NO + wx.wxICON_WARNING
   )
-  if answer == wx.wxYES then
-    self:request_elevation()
-  else
-    self:set_status("Update cancelled — elevation required")
+  if answer ~= wx.wxYES then
+    self:set_status(ViewModel.STATUS.ELEVATION_CANCELLED)
+    return false
   end
+
+  self:request_elevation()
+  if self.elevated then
+    return true
+  end
+  self:set_status("Administrator approval is required. Approve the security prompt, then try again.")
   return false
 end
 
@@ -443,7 +538,7 @@ function MainFrame:_run_apply(dry_run, confirmed, options)
   self:_set_actions_enabled(false)
   local action_label = "Installing updates..."
   if dry_run then
-    action_label = "Applying updates (dry run)..."
+    action_label = "Previewing updates (no changes)..."
   elseif options.package_ids and #options.package_ids == 1
       and options.package_ids[1] == ViewModel.CURSOR_PACKAGE_ID then
     action_label = "Installing Cursor update..."
@@ -452,7 +547,7 @@ function MainFrame:_run_apply(dry_run, confirmed, options)
   end
   self:set_status(action_label)
 
-  local log_line = dry_run and "Initiating dry-run update..." or "Initiating update..."
+  local log_line = dry_run and "Starting preview (no changes will be made)..." or "Starting install..."
   self:append_log(log_line)
 
   local params = ViewModel.build_apply_params(

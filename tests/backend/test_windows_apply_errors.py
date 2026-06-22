@@ -5,9 +5,8 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from veripatch.detection.os_detect import OSInfo, OSType
-from veripatch.execution.runner import CommandRunner, ExecutionResult
+from veripatch.execution.runner import ExecutionResult
 from veripatch.privileges.audit import AuditLogger
-from veripatch.sources.validator import SourceValidator
 from veripatch.updaters.base import UpdateItem, UpdateStatus
 from veripatch.updaters.windows import (
     CURSOR_PACKAGE_ID,
