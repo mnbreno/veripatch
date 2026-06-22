@@ -40,6 +40,7 @@ desktop.ini
 artifacts/
 packaging/windows/staging/
 packaging/windows/cache/
+packaging/release-zip/
 
 # Embedded submodules
 tools/wxlua542

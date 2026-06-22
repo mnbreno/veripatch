@@ -76,11 +76,19 @@ jobs:
           $version = "${{ needs.validate.outputs.version }}"
           .\scripts\build-windows-installer.ps1 -Version $version
 
-      - name: Upload installer artifact
+      - name: Build release ZIP
+        shell: pwsh
+        run: |
+          $version = "${{ needs.validate.outputs.version }}"
+          .\scripts\build-release-zip.ps1 -Version $version
+
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: VeriPatch-Windows-Setup
-          path: artifacts/VeriPatch-${{ needs.validate.outputs.version }}-Setup.exe
+          name: VeriPatch-Release-Assets
+          path: |
+            artifacts/VeriPatch-${{ needs.validate.outputs.version }}-Setup.exe
+            artifacts/VeriPatch-${{ needs.validate.outputs.version }}.zip
 
   publish:
     name: Publish GitHub Release
@@ -89,15 +97,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download installer
+      - name: Download release assets
         uses: actions/download-artifact@v4
         with:
-          name: VeriPatch-Windows-Setup
+          name: VeriPatch-Release-Assets
           path: artifacts/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: VeriPatch v${{ needs.validate.outputs.version }}
-          files: artifacts/VeriPatch-${{ needs.validate.outputs.version }}-Setup.exe
+          files: |
+            artifacts/VeriPatch-${{ needs.validate.outputs.version }}-Setup.exe
+            artifacts/VeriPatch-${{ needs.validate.outputs.version }}.zip
           generate_release_notes: true

@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here.
 
+## [1.2.0] — 2026-06-22
+
+### VeriPatch
+
+- Windows installer (`VeriPatch-Setup.exe`) and source release ZIP on GitHub Releases
+- AgentMesh removed from public repository; release consensus gate for stable tags
+- Apply streaming improvements, Windows updater skip/dry-run fixes, headless GUI launch
+- Cursor apply blockers, selected package apply, and GUI feature tests
+
 ## [1.1.0] — 2026-06-21
 
 ### VeriPatch
