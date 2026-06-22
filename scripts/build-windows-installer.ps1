@@ -119,9 +119,9 @@ if ($WxLuaDir -and (Test-Path $WxLuaDir)) {
     Copy-Item -Recurse -Force $WxLuaDir (Join-Path $AppDir "tools\wxlua542")
 }
 
-# Launcher wrapper for installed layout
+# Launcher wrapper for installed layout ({app}\VeriPatch.ps1 sits at install root)
 @'
-$InstallRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Definition)
+$InstallRoot = $PSScriptRoot
 $env:VERIPATCH_PYTHON = Join-Path $InstallRoot "python\pythonw.exe"
 $env:VERIPATCH_LUA = Join-Path $InstallRoot "app\tools\wxlua542\bin\64bit\wxLua.exe"
 & (Join-Path $InstallRoot "app\scripts\start-gui.ps1")

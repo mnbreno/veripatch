@@ -86,7 +86,7 @@ def _cursor_is_running() -> bool:
             timeout=10,
             check=False,
         )
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return False
     output = _decode_output_bytes(completed.stdout or b"")
     return "cursor.exe" in output.lower()
@@ -288,6 +288,8 @@ class WindowsUpdater(Updater):
     def list_updates(self) -> UpdateResult:
         self.audit.log_action("windows_list_updates", {})
         items: list[UpdateItem] = []
+        errors: list[str] = []
+        winget_list_failed = False
 
         if self._winget_available():
             cmd = _winget_list_cmd()
@@ -304,14 +306,19 @@ class WindowsUpdater(Updater):
                     )
                 elif result.success:
                     items.extend(parse_winget_upgrade(result.stdout, self.SOURCE_WINGET))
+                else:
+                    winget_list_failed = True
+                    errors.append("WinGet list command failed")
 
         items.extend(self._list_wua_updates())
 
+        success = not winget_list_failed or bool(items)
         return UpdateResult(
-            success=True,
+            success=success,
             dry_run=self.dry_run,
             message=f"Listed {len(items)} Windows update(s)",
             items=items,
+            errors=errors,
         )
 
     def apply(self, dry_run: bool = True) -> UpdateResult:
@@ -522,6 +529,16 @@ class WindowsUpdater(Updater):
                     ],
                     items=[],
                 )
+
+            yield "[VeriPatch] No packages left to update after applying skip rules."
+            return UpdateResult(
+                success=True,
+                dry_run=dry_run,
+                message="All available updates were skipped",
+                summary={"updated": 0, "skipped": len(skip), "failed": 0},
+                errors=[],
+                items=[],
+            )
 
         cmd = _winget_apply_cmd()
         exec_result = yield from self._yield_command_stream(

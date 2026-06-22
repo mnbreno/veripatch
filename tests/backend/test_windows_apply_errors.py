@@ -176,3 +176,41 @@ def test_apply_streaming_selected_package_ids(tmp_path) -> None:
 
     assert result.success is True
     assert result.summary == {"updated": 1, "skipped": 0, "failed": 0}
+
+
+def test_apply_streaming_skip_only_non_cursor_package(tmp_path) -> None:
+    audit = AuditLogger(log_path=tmp_path / "audit.log")
+    info = OSInfo(os_type=OSType.WINDOWS, version="10", release="10", architecture="AMD64")
+    updater = WindowsUpdater(info, audit_logger=audit, dry_run=False)
+
+    firefox_item = UpdateItem(
+        id="winget-Mozilla.Firefox",
+        title="Firefox",
+        source_id=WindowsUpdater.SOURCE_WINGET,
+        status=UpdateStatus.AVAILABLE,
+        metadata={"package_id": "Mozilla.Firefox"},
+    )
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("winget upgrade --all should not run when all packages are skipped")
+
+    with patch.object(
+        updater,
+        "list_updates",
+        return_value=type("Listed", (), {"items": [firefox_item]})(),
+    ):
+        with patch.object(updater, "_yield_command_stream", side_effect=fail_if_called):
+            stream = updater.apply_streaming(
+                dry_run=False,
+                skip_package_ids=frozenset({"Mozilla.Firefox"}),
+            )
+            lines = []
+            try:
+                while True:
+                    lines.append(next(stream))
+            except StopIteration as exc:
+                result = exc.value
+
+    assert any("No packages left to update" in line for line in lines)
+    assert result.success is True
+    assert result.summary == {"updated": 0, "skipped": 1, "failed": 0}

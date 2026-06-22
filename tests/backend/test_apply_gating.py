@@ -51,6 +51,24 @@ def test_apply_with_valid_token_and_elevation(
 
 
 @patch("veripatch.ipc.server.is_elevated", return_value=False)
+@patch("veripatch.ipc.server.request_elevation")
+def test_apply_does_not_spawn_elevation_on_gate(
+    mock_request_elevation: object,
+    _mock_elevated: object,
+) -> None:
+    server = JsonRpcServer()
+    result = server._handle_apply_updates(
+        {
+            "dry_run": False,
+            "confirm": True,
+            "confirm_token": APPLY_CONFIRMATION_TOKEN,
+        }
+    )
+    assert result["success"] is False
+    mock_request_elevation.assert_not_called()
+
+
+@patch("veripatch.ipc.server.is_elevated", return_value=False)
 def test_apply_requires_elevation_when_not_elevated(_mock: object) -> None:
     server = JsonRpcServer()
     result = server._handle_apply_updates(
@@ -121,6 +139,13 @@ def test_diagnostics_with_audit_limit() -> None:
     result = server._handle_diagnostics({"audit_limit": 5})
     assert isinstance(result["recent_audit_entries"], list)
     assert len(result["recent_audit_entries"]) <= 5
+
+
+def test_diagnostics_with_invalid_audit_limit() -> None:
+    server = JsonRpcServer()
+    result = server._handle_diagnostics({"audit_limit": "bad"})
+    assert isinstance(result["recent_audit_entries"], list)
+    assert len(result["recent_audit_entries"]) <= 20
 
 
 def test_diagnostics_with_empty_params() -> None:

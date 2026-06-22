@@ -202,8 +202,9 @@ local function pop_json_line(buffer)
   return line, rest
 end
 
-local function socket_read_line(client, buffer)
+local function socket_read_line(client, buffer, read_wait_sec)
   buffer = buffer or ""
+  local wait_sec = read_wait_sec or 5
 
   while true do
     local line
@@ -216,7 +217,7 @@ local function socket_read_line(client, buffer)
     if chunk == "" then
       if client.WaitForRead then
         local ok = pcall(function()
-          client:WaitForRead(5, 0)
+          client:WaitForRead(wait_sec, 0)
         end)
         if ok then
           chunk = socket_read_some(client)
@@ -384,6 +385,14 @@ end
 function ipc:reset_backend_session()
   self._backend_ready = false
   self._spawn_attempted = false
+  self.use_rpc = true
+end
+
+function ipc:poll_elevated()
+  if not self:_ping_backend() then
+    return nil, "backend not ready"
+  end
+  return self:_call_socket("detect_os", {})
 end
 
 function ipc:mark_backend_managed()
@@ -405,9 +414,13 @@ function ipc:_call_socket(method, params, on_progress)
   socket_send_request(client, request_id, method, params)
 
   local buffer = ""
+  local read_wait = 5
+  if method == "apply_updates_stream" then
+    read_wait = tonumber(os.getenv("VERIPATCH_APPLY_TIMEOUT")) or 1800
+  end
   while true do
     local line
-    line, buffer = socket_read_line(client, buffer)
+    line, buffer = socket_read_line(client, buffer, read_wait)
     if not line or line == "" then
       client:Close()
       return nil, "Empty response from backend"
@@ -509,8 +522,13 @@ function ipc:_call_rpc(method, params, on_progress)
 end
 
 function ipc:call(method, params, on_progress)
+  if not self.use_rpc and self:_ping_backend() then
+    self.use_rpc = true
+    self._backend_ready = true
+  end
+
   if self.use_rpc then
-    if not self:ensure_backend() then
+    if not self:_ping_backend() and not self:ensure_backend() then
       self.use_rpc = false
     end
   end

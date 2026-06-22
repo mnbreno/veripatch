@@ -6,7 +6,7 @@ import json
 import os
 import sys
 from collections.abc import Callable
-from typing import Any, TextIO
+from typing import Any, TextIO, cast
 
 from veripatch.config import APPLY_CONFIRMATION_TOKEN
 from veripatch.detection.os_detect import OSType, detect_os
@@ -82,17 +82,23 @@ class JsonRpcServer:
             return {**guidance, "spawned": False, "success": True}
 
         if spawn:
-            request_elevation(audit_logger=self.audit)
+            launched = request_elevation(audit_logger=self.audit)
+            guidance = get_elevation_guidance()
             if sys.platform == "win32":
                 return {
                     **guidance,
-                    "spawned": True,
-                    "success": True,
-                    "message": "UAC elevation prompt launched",
+                    "spawned": launched and not guidance["elevated"],
+                    "success": launched,
+                    "message": (
+                        "UAC elevation prompt launched"
+                        if launched
+                        else "Elevation was denied or failed"
+                    ),
                 }
-            return {**guidance, "spawned": False, "success": True}
+            return {**guidance, "spawned": False, "success": launched}
 
         self.audit.log_action("elevation_guidance_returned", {"spawn": False})
+        guidance = get_elevation_guidance()
         return {**guidance, "spawned": False, "success": True}
 
     def _handle_list_sources(self, _params: dict[str, Any] | list[Any] | None) -> dict[str, Any]:
@@ -129,7 +135,10 @@ class JsonRpcServer:
     def _handle_diagnostics(self, params: dict[str, Any] | list[Any] | None) -> dict[str, Any]:
         limit = 20
         if isinstance(params, dict) and "audit_limit" in params:
-            limit = int(params["audit_limit"])
+            try:
+                limit = max(1, min(int(params["audit_limit"]), 500))
+            except (TypeError, ValueError):
+                limit = 20
         return get_diagnostics(
             self.audit,
             audit_limit=limit,
@@ -163,7 +172,6 @@ class JsonRpcServer:
                     "items": [],
                 }
             if not is_elevated():
-                request_elevation(audit_logger=self.audit)
                 self.audit.log_privilege_check(required=True, granted=False)
                 return dry_run, {
                     "success": False,
@@ -174,6 +182,20 @@ class JsonRpcServer:
                 }
         return dry_run, None
 
+    def _extract_apply_filters(
+        self, params: dict[str, Any] | list[Any] | None
+    ) -> tuple[frozenset[str] | None, frozenset[str] | None]:
+        skip_ids = None
+        package_ids = None
+        if isinstance(params, dict):
+            raw_skip = params.get("skip_package_ids")
+            if isinstance(raw_skip, list):
+                skip_ids = frozenset(str(item) for item in raw_skip if item)
+            raw_packages = params.get("package_ids")
+            if isinstance(raw_packages, list):
+                package_ids = frozenset(str(item) for item in raw_packages if item)
+        return skip_ids, package_ids
+
     def _handle_apply_updates(self, params: dict[str, Any] | list[Any] | None) -> dict[str, Any]:
         dry_run, gate_error = self._apply_gate(params)
         if gate_error:
@@ -181,6 +203,20 @@ class JsonRpcServer:
 
         info = detect_os()
         updater = get_updater(info, audit_logger=self.audit, dry_run=_env_dry_run())
+        skip_ids, package_ids = self._extract_apply_filters(params)
+        if skip_ids or package_ids:
+            stream = updater.apply_streaming(
+                dry_run=dry_run,
+                skip_package_ids=skip_ids,
+                package_ids=package_ids,
+            )
+            try:
+                while True:
+                    next(stream)
+            except StopIteration as exc:
+                result = exc.value
+            return cast(dict[str, Any], result.to_dict())
+
         result = updater.apply(dry_run=dry_run)
         return result.to_dict()
 
@@ -197,15 +233,7 @@ class JsonRpcServer:
 
         info = detect_os()
         updater = get_updater(info, audit_logger=self.audit, dry_run=_env_dry_run())
-        skip_ids = None
-        package_ids = None
-        if isinstance(request.params, dict):
-            raw_skip = request.params.get("skip_package_ids")
-            if isinstance(raw_skip, list):
-                skip_ids = frozenset(str(item) for item in raw_skip if item)
-            raw_packages = request.params.get("package_ids")
-            if isinstance(raw_packages, list):
-                package_ids = frozenset(str(item) for item in raw_packages if item)
+        skip_ids, package_ids = self._extract_apply_filters(request.params)
         stream = updater.apply_streaming(
             dry_run=dry_run,
             skip_package_ids=skip_ids,

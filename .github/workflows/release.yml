@@ -76,7 +76,11 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ needs.validate.outputs.version }}"
-          .\scripts\build-windows-installer.ps1 -Version $version
+          $wxArgs = @()
+          if (Test-Path "tools/wxlua542") {
+            $wxArgs = @("-WxLuaDir", "tools/wxlua542")
+          }
+          .\scripts\build-windows-installer.ps1 -Version $version @wxArgs
 
       - name: Build release ZIP
         shell: pwsh

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import locale
 import os
+import queue
 import re
 import subprocess
 import sys
+import threading
+import time
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from typing import Any
@@ -287,6 +290,16 @@ class CommandRunner:
         self.audit.log_action("command_execute", {"command": command})
         stdout_acc: list[bytes] = []
         process: subprocess.Popen[bytes] | None = None
+        line_queue: queue.Queue[bytes | None] = queue.Queue()
+        deadline = time.monotonic() + self.timeout
+
+        def _enqueue_stdout() -> None:
+            try:
+                if process and process.stdout:
+                    for raw_line in process.stdout:
+                        line_queue.put(raw_line)
+            finally:
+                line_queue.put(None)
 
         try:
             process = subprocess.Popen(
@@ -298,14 +311,27 @@ class CommandRunner:
                 env=_subprocess_env(),
                 creationflags=_subprocess_creationflags(),
             )
-            if process.stdout:
-                for raw_line in process.stdout:
-                    stdout_acc.append(raw_line)
-                    line = _decode_output_bytes(raw_line.rstrip(b"\r\n"))
-                    cleaned = _clean_output_line(line)
-                    if cleaned:
-                        yield cleaned
-            exit_code = process.wait(timeout=self.timeout)
+            reader = threading.Thread(target=_enqueue_stdout, daemon=True)
+            reader.start()
+
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command, self.timeout)
+                try:
+                    raw_line = line_queue.get(timeout=min(remaining, 1.0))
+                except queue.Empty:
+                    continue
+                if raw_line is None:
+                    break
+                stdout_acc.append(raw_line)
+                line = _decode_output_bytes(raw_line.rstrip(b"\r\n"))
+                cleaned = _clean_output_line(line)
+                if cleaned:
+                    yield cleaned
+
+            reader.join(timeout=5)
+            exit_code = process.wait(timeout=max(0.0, deadline - time.monotonic()))
         except subprocess.TimeoutExpired:
             if process is not None:
                 process.kill()

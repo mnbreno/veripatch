@@ -367,6 +367,7 @@ end
 
 function MainFrame:request_elevation()
   self:set_status(ViewModel.STATUS.ELEVATION_PENDING)
+  local used_ps1_launcher = false
   if win_silent.is_windows() and self.backend_config.project_root then
     local spawned = win_silent.spawn_elevated_backend(
       self.backend_config.project_root,
@@ -374,14 +375,17 @@ function MainFrame:request_elevation()
       self.backend_config.python_cmd
     )
     if spawned then
-      self.ipc_client:mark_backend_managed()
+      used_ps1_launcher = true
       if self:_wait_for_elevated_backend() then
         return
       end
     end
   end
 
-  local result, err = self.ipc_client:call("request_elevation", { spawn = true })
+  local result, err = self.ipc_client:call(
+    "request_elevation",
+    { spawn = not used_ps1_launcher }
+  )
   local status = ViewModel.format_elevation_status(result, err)
   self:set_status(status)
   self:append_log(status)
@@ -394,15 +398,16 @@ end
 
 function MainFrame:_wait_for_elevated_backend()
   self.ipc_client:reset_backend_session()
-  self.ipc_client:mark_backend_managed()
   for _ = 1, 40 do
     win_silent.sleep_ms(500, wx)
-    local os_result = self.ipc_client:call("detect_os")
+    local os_result = self.ipc_client:poll_elevated()
     if os_result and os_result.elevated then
       self.elevated = true
       local status = ViewModel.format_elevation_status({ elevated = true })
       self:set_status(status)
       self:append_log(status)
+      local os_text = ViewModel.format_os_label(os_result)
+      self.os_label:SetLabel(to_wx_string(os_text))
       return true
     end
   end
@@ -461,6 +466,23 @@ function MainFrame:update_selected()
   if #package_ids == 0 then
     self:set_status("Select at least one update to install")
     return
+  end
+
+  if ViewModel.should_prompt_cursor_gate(self.update_items, self.blockers) then
+    for _, package_id in ipairs(package_ids) do
+      if package_id == ViewModel.CURSOR_PACKAGE_ID then
+        local gate = wx.wxMessageBox(
+          ViewModel.cursor_gate_message(),
+          ViewModel.update_selected_button_label(),
+          wx.wxYES_NO + wx.wxICON_QUESTION + wx.wxNO_DEFAULT
+        )
+        if gate ~= wx.wxYES then
+          self:set_status("Update cancelled")
+          return
+        end
+        break
+      end
+    end
   end
 
   local answer = wx.wxMessageBox(

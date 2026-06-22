@@ -51,6 +51,7 @@ def run_rpc(argv: list[str] | None = None) -> int:
         return 2
 
     client = get_client(host=args.host, port=args.port)
+    request_id: int | str | None = None
     try:
         if isinstance(client, SocketJsonRpcClient):
             client.connect()

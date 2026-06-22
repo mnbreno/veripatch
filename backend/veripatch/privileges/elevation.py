@@ -62,8 +62,8 @@ def request_elevation(
     """
     Request elevation for the current process.
 
-    Returns True if already elevated. On Windows, spawns an elevated process
-    and returns False. On macOS/Linux, logs guidance for sudo/pkexec re-launch.
+    Returns True if already elevated or if an elevation prompt was launched successfully.
+    Returns False if elevation was denied or failed.
     """
     if is_elevated():
         if audit_logger:
@@ -98,7 +98,7 @@ def request_elevation(
                 return False
             if audit_logger:
                 audit_logger.log_action("elevation_spawned", {"method": "UAC runas"})
-            return False
+            return True
         except (AttributeError, OSError) as exc:
             if audit_logger:
                 audit_logger.log_action("elevation_failed", {"error": str(exc)})

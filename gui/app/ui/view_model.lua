@@ -99,7 +99,7 @@ function ViewModel.parse_update_items(upd_result)
         id = item.id,
         title = item.title,
         source_id = item.source_id,
-        package_id = metadata.package_id,
+        package_id = metadata.package_id or metadata.package,
         display = item.title or item.id or "Update",
       })
     end
